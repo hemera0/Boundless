@@ -41,7 +41,7 @@ Boundless::Buffer::Buffer(
     vkBindBufferMemory(m_Device, m_Handle, m_Memory, 0);
 }
 
-Boundless::Buffer::Buffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const BufferDesc& bufferDesc) : 
+Boundless::Buffer::Buffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const Buffer::Desc& bufferDesc) : 
     Buffer(device, physicalDevice, bufferDesc.m_Size, bufferDesc.m_Usage, bufferDesc.m_MemoryFlags, bufferDesc.m_SharingMode, bufferDesc.m_AllocateFlags) {}
 
 Boundless::Buffer::~Buffer() {
@@ -73,6 +73,3 @@ const VkDeviceAddress& Boundless::Buffer::GetDeviceAddress() const {
     deviceAddrInfo.buffer = GetHandle();
     return vkGetBufferDeviceAddress(m_Device, &deviceAddrInfo);
 }
-
-Boundless::BufferDesc::BufferDesc(const VkDeviceSize size, const VkBufferUsageFlags usage, const VkMemoryPropertyFlags memoryFlags, const VkSharingMode sharingMode, const VkMemoryAllocateFlags allocateFlags) : 
-    m_Size(size), m_Usage(usage), m_MemoryFlags(memoryFlags), m_SharingMode(sharingMode), m_AllocateFlags(allocateFlags) {}

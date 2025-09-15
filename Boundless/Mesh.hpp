@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 
 namespace Boundless {
-	struct alignas(16) MeshVertexData {
+	struct alignas( 16 ) MeshVertexData {
 		glm::vec3 m_Position{};
 		float m_UVx{};
 		glm::vec3 m_Normal{};
@@ -12,6 +12,7 @@ namespace Boundless {
 	};
 
 	struct Mesh {
+		std::string m_Name{};
 		std::vector<MeshVertexData> m_Vertices{};
 
 		Buffer* m_VertexBuffer = nullptr;
@@ -24,7 +25,7 @@ namespace Boundless {
 		Mask
 	};
 
-	struct alignas(16) Material {
+	struct alignas( 16 ) Material {
 		float m_MetallicFactor{};
 		float m_RoughnessFactor{};
 		EAlphaMode m_AlphaMode{};

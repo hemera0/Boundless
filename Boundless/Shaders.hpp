@@ -30,7 +30,7 @@ namespace Boundless {
 		void Create();
 		void Destroy();
 
-		IDxcBlob* CompileShader(const std::wstring& shaderPath, ShaderType shaderType);
+		IDxcBlob* CompileShader( const std::wstring& shaderPath, ShaderType shaderType );
 	private:
 		IDxcLibrary* m_Library = nullptr;
 		IDxcCompiler3* m_Compiler = nullptr;

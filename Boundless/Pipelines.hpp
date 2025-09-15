@@ -5,17 +5,17 @@
 namespace Boundless {
 	class PipelineLayoutBuilder {
 	public:
-		PipelineLayoutBuilder& SetDescriptorSets(const std::vector<VkDescriptorSetLayout>& descriptorSets) {
+		PipelineLayoutBuilder& SetDescriptorSets( const std::vector<VkDescriptorSetLayout>& descriptorSets ) {
 			m_DescriptorSets = descriptorSets;
 			return *this;
 		}
 
-		PipelineLayoutBuilder& SetPushConstants(const std::vector<VkPushConstantRange>& pushConstants) {
+		PipelineLayoutBuilder& SetPushConstants( const std::vector<VkPushConstantRange>& pushConstants ) {
 			m_PushConstants = pushConstants;
 			return *this;
 		}
 
-		VkPipelineLayout Build(const VkDevice& device);
+		VkPipelineLayout Build( const VkDevice& device );
 	private:
 		std::vector<VkDescriptorSetLayout> m_DescriptorSets{};
 		std::vector<VkPushConstantRange> m_PushConstants{};
@@ -25,71 +25,71 @@ namespace Boundless {
 	public:
 		PipelineBuilder();
 
-		PipelineBuilder& SetShaderBlobs(const std::vector<std::pair<IDxcBlob*, VkShaderStageFlagBits>>& shaders) {
+		PipelineBuilder& SetShaderBlobs( const std::vector<std::pair<IDxcBlob*, VkShaderStageFlagBits>>& shaders ) {
 			m_ShaderBlobs = shaders;
 			return *this;
 		}
 
-		PipelineBuilder& SetColorAttachmentFormats(const std::vector<VkFormat>& colorFormats) {
+		PipelineBuilder& SetColorAttachmentFormats( const std::vector<VkFormat>& colorFormats ) {
 			m_ColorFormats = colorFormats;
 			return *this;
 		}
 
-		PipelineBuilder& SetDepthAttachmentFormat(VkFormat depthFormat) {
+		PipelineBuilder& SetDepthAttachmentFormat( VkFormat depthFormat ) {
 			m_DepthFormat = depthFormat;
 			return *this;
 		}
 
-		PipelineBuilder& SetPipelineLayout(const VkPipelineLayout& pipelineLayout) {
+		PipelineBuilder& SetPipelineLayout( const VkPipelineLayout& pipelineLayout ) {
 			m_PipelineLayout = pipelineLayout;
 			return *this;
 		}
 
-		PipelineBuilder& SetInputAttributeDescriptions(const std::vector<VkVertexInputAttributeDescription>& inputAttributeDescriptions) {
+		PipelineBuilder& SetInputAttributeDescriptions( const std::vector<VkVertexInputAttributeDescription>& inputAttributeDescriptions ) {
 			m_InputAttributeDescriptions = inputAttributeDescriptions;
 			return *this;
 		}
 
-		PipelineBuilder& SetInputBindingDescriptions(const std::vector<VkVertexInputBindingDescription>& inputBindingDescriptions) {
+		PipelineBuilder& SetInputBindingDescriptions( const std::vector<VkVertexInputBindingDescription>& inputBindingDescriptions ) {
 			m_InputBindingDescriptions = inputBindingDescriptions;
 			return *this;
 		}
 
-		PipelineBuilder& SetMultisampleState(const VkPipelineMultisampleStateCreateInfo& multisampleState) {
+		PipelineBuilder& SetMultisampleState( const VkPipelineMultisampleStateCreateInfo& multisampleState ) {
 			m_MultisampleState = multisampleState;
 			return *this;
 		}
-		PipelineBuilder& SetInputAssemblyState(const VkPipelineInputAssemblyStateCreateInfo& inputAssemblyState) {
+		PipelineBuilder& SetInputAssemblyState( const VkPipelineInputAssemblyStateCreateInfo& inputAssemblyState ) {
 			m_InputAssemblyState = inputAssemblyState;
 			return *this;
 		}
 
-		PipelineBuilder& SetRasterizationState(const VkPipelineRasterizationStateCreateInfo& rasterizationState) {
+		PipelineBuilder& SetRasterizationState( const VkPipelineRasterizationStateCreateInfo& rasterizationState ) {
 			m_RasterizationState = rasterizationState;
 			return *this;
 		}
 
-		PipelineBuilder& SetDepthStencilState(const VkPipelineDepthStencilStateCreateInfo& depthStencilState) {
+		PipelineBuilder& SetDepthStencilState( const VkPipelineDepthStencilStateCreateInfo& depthStencilState ) {
 			m_DepthStencilState = depthStencilState;
 			return *this;
 		}
 
-		PipelineBuilder& SetDynamicState(const VkPipelineDynamicStateCreateInfo& dynamicState) {
+		PipelineBuilder& SetDynamicState( const VkPipelineDynamicStateCreateInfo& dynamicState ) {
 			m_DynamicState = dynamicState;
 			return *this;
 		}
 
-		PipelineBuilder& SetColorBlendAttachmentStates(const std::vector<VkPipelineColorBlendAttachmentState>& colorBlendAttachmentStates) {
+		PipelineBuilder& SetColorBlendAttachmentStates( const std::vector<VkPipelineColorBlendAttachmentState>& colorBlendAttachmentStates ) {
 			m_ColorBlendAttachmentStates = colorBlendAttachmentStates;
 			return *this;
 		}
 
-		PipelineBuilder& SetColorBlendState(const VkPipelineColorBlendStateCreateInfo& colorBlendState) {
+		PipelineBuilder& SetColorBlendState( const VkPipelineColorBlendStateCreateInfo& colorBlendState ) {
 			m_ColorBlendState = colorBlendState;
 			return *this;
 		}
 
-		VkPipeline Build(const VkDevice& device, const VkSwapchainKHR& swapchain);
+		VkPipeline Build( const VkDevice& device, const VkSwapchainKHR& swapchain );
 	private:
 		std::vector<std::pair<IDxcBlob*, VkShaderStageFlagBits>> m_ShaderBlobs{};
 

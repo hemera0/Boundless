@@ -13,7 +13,7 @@ namespace Boundless {
 			const float fov,
 			const float aspect,
 			const float nearZ,
-			const float farZ);
+			const float farZ );
 
 		const glm::mat4& GetViewMatrix() const { return m_ViewMatrix; }
 		const glm::mat4& GetInvViewMatrix() const { return m_InvViewMatrix; }

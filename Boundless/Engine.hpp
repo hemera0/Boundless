@@ -70,9 +70,7 @@ namespace Boundless {
 		uint32_t m_CurrentImageIndex{};
 		uint32_t m_CurrentFrame{};
 
-		VkCommandBuffer GetCurrentCommandBuffer() {
-			return m_CommandBuffers[m_CurrentFrame];
-		}
+		VkCommandBuffer GetCurrentCommandBuffer() { return m_CommandBuffers[m_CurrentFrame]; }
 
 		// Shader Compilation...
 		std::unique_ptr<ShaderCompiler> m_ShaderCompiler = {};
@@ -80,8 +78,6 @@ namespace Boundless {
 		// Default Pipeline...
 		VkPipelineLayout m_DefaultPipelineLayout = VK_NULL_HANDLE;
 		VkPipeline m_DefaultPipeline = VK_NULL_HANDLE;
-
-		Buffer* m_VertexPool = nullptr;
 
 		// Descriptors...
 		VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
@@ -92,8 +88,11 @@ namespace Boundless {
 		void CreateBindlessTextureDescriptors();
 		void PushTexturesToTexturePool(const std::vector<VkImageView>& textures, VkSampler sampler);
 
-		Buffer* GrowBuffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, Buffer* buffer, const Boundless::BufferDesc& bufferDesc);
-
 		void RenderScene(Scene& scene);
+		void UploadSceneMeshes(Scene& scene);
+		void UpdateSceneMeshData(Scene& scene);
+
+		// Temporary Buffer... (This should probably be held by the scene itself...)
+		Buffer* m_SceneUniforms = nullptr;
 	};
 }

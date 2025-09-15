@@ -5,9 +5,14 @@ struct VertexData {
     float UVy;
 };
 
-struct _ {    
-    float4x4 ModelViewProjectionMatrix;
+struct SceneData {
+    float4x4 CameraViewProjectionMatrix;
+    float4 SunDirection;
+    float4 SunColor;
+};
 
+struct _ {    
+    vk::BufferPointer<SceneData> Scene;
     // This is a lifehack since HLSL doesn't support unsized arrays in structs...
     vk::BufferPointer<VertexData[1]> Vertices;     
 };
@@ -23,9 +28,10 @@ struct VS_Output {
 
 VS_Output main(uint VertexIndex : SV_VertexID) {
     VertexData vertex = PushConstants.Vertices.Get()[VertexIndex];
+    SceneData scene = PushConstants.Scene.Get();
 
     VS_Output res;
-    res.Position = mul(PushConstants.ModelViewProjectionMatrix, float4(vertex.Position.xyz, 1.f) );
+    res.Position = mul(scene.CameraViewProjectionMatrix, float4(vertex.Position.xyz, 1.f) );
     res.Normal = normalize(vertex.Normal.xyz);
     res.UV = float2(vertex.UVx, vertex.UVy);
 

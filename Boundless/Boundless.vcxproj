@@ -48,8 +48,8 @@
     <LibraryPath>..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\Dependencies\include;$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -58,6 +58,8 @@
       <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;GLFW_EXPOSE_NATIVE_WIN32;GLM_FORCE_RADIANS;GLM_FORCE_DEPTH_ZERO_TO_ONE;NOMINMAX;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -71,9 +73,11 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;GLFW_EXPOSE_NATIVE_WIN32;GLM_FORCE_RADIANS;GLM_FORCE_DEPTH_ZERO_TO_ONE;NOMINMAX;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,6 +108,7 @@
     <ClInclude Include="Pipelines.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Shaders.hpp" />
+    <ClInclude Include="Transform.hpp" />
     <ClInclude Include="VkUtil.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
