@@ -14,8 +14,6 @@ namespace Boundless {
 	public:
 		entt::registry& GetRegistry() { return m_Registry; }
 
-		void OnTick();
-
 		void Render();
 
 		const Camera& GetMainCamera() const { return m_MainCamera; }

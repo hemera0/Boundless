@@ -37,7 +37,8 @@ Boundless::Image::Image(
 	vkBindImageMemory( m_Device, m_Image, m_ImageMemory, 0 );
 }
 
-Boundless::Image::~Image() { }
+Boundless::Image::Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const Image::Desc& imageDesc ) : 
+	Image( device, physicalDevice, imageDesc.m_Width, imageDesc.m_Height, imageDesc.m_Levels, imageDesc.m_Format, imageDesc.m_Tiling, imageDesc.m_Samples, imageDesc.m_Usage, imageDesc.m_Properties ) { }
 
 VkImageCreateInfo Boundless::Image::GetDefault2DCreateInfo( uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage ) {
 	VkImageCreateInfo res{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };

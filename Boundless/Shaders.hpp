@@ -1,6 +1,8 @@
 #pragma once
 #include "VkUtil.hpp"
+
 #include <dxcapi.h>
+#include <wrl/client.h>
 
 namespace Boundless {
 	enum class ShaderType {
@@ -11,29 +13,12 @@ namespace Boundless {
 
 	class ShaderCompiler {
 	public:
-		static ShaderCompiler* s_Instance;
-
-		ShaderCompiler() {
-			s_Instance = this;
-
-			Create();
-		}
-
-		~ShaderCompiler() {
-			Destroy();
-		}
-
-		static ShaderCompiler* GetInstance() {
-			return s_Instance;
-		}
-
-		void Create();
-		void Destroy();
+		ShaderCompiler();
 
 		IDxcBlob* CompileShader( const std::wstring& shaderPath, ShaderType shaderType );
 	private:
-		IDxcLibrary* m_Library = nullptr;
-		IDxcCompiler3* m_Compiler = nullptr;
-		IDxcUtils* m_Utils = nullptr;
+		Microsoft::WRL::ComPtr<IDxcLibrary> m_Library = nullptr;
+		Microsoft::WRL::ComPtr<IDxcCompiler3> m_Compiler = nullptr;
+		Microsoft::WRL::ComPtr<IDxcUtils> m_Utils = nullptr;
 	};
 }

@@ -3,21 +3,21 @@
 
 namespace Boundless {
 	class Image {
-		VkDevice m_Device = VK_NULL_HANDLE;
-		VkImage m_Image = VK_NULL_HANDLE;
-		VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
-
-		VkFormat m_Format{};
-		VkImageViewType m_ViewType{};
-
-		uint32_t m_LevelCount{};
-
-		uint32_t m_Width{}, m_Height{};
-
 	public:
-		Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageCreateInfo* optionalCI = nullptr );
-		~Image();
+		struct Desc {
+			uint32_t m_Width;
+			uint32_t m_Height;
+			uint32_t m_Levels;
+			VkFormat m_Format; 
+			VkImageTiling m_Tiling;
+			VkSampleCountFlagBits m_Samples;
+			VkImageUsageFlags m_Usage;
+			VkMemoryPropertyFlags m_Properties;
+		};
 
+		Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageCreateInfo* optionalCI = nullptr );
+		Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const Image::Desc& imageDesc);
+		
 		static VkImageCreateInfo GetDefault2DCreateInfo( uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage );
 
 		static Image* LoadFromFile( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const std::string& path );
@@ -37,5 +37,16 @@ namespace Boundless {
 		operator VkImage() {
 			return m_Image;
 		}
+	private:
+		VkDevice m_Device = VK_NULL_HANDLE;
+		VkImage m_Image = VK_NULL_HANDLE;
+		VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
+
+		VkFormat m_Format{};
+		VkImageViewType m_ViewType{};
+
+		uint32_t m_LevelCount{};
+
+		uint32_t m_Width{}, m_Height{};
 	};
 }

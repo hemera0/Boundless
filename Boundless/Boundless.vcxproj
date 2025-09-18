@@ -91,6 +91,7 @@
     <ClCompile Include="GLTFImporter.cpp" />
     <ClCompile Include="Image.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="OBJImporter.cpp" />
     <ClCompile Include="Pipelines.cpp" />
     <ClCompile Include="Scene.cpp" />

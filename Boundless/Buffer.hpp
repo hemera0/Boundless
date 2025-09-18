@@ -5,8 +5,6 @@
 // Represents a Vulkan buffer handle and it's memory...
 
 namespace Boundless {
-
-
 	class Buffer {
 		VkDevice m_Device = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

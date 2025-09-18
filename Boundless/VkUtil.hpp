@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <set>
 #include <string>
@@ -42,6 +43,7 @@ namespace VkUtil {
 	bool PhysicalDeviceIsDiscreteGPU( const VkPhysicalDevice& physicalDevice );
 	bool PhysicalDeviceHasExtensions( const VkPhysicalDevice& physicalDevice, const std::vector<const char*>& wantedExtensions );
 	uint32_t PhysicalDeviceFindMemoryType( const VkPhysicalDevice& physicalDevice, const uint32_t filter, const VkMemoryPropertyFlags propertyFlags );
+	VkFormat PhysicalDeviceFindDepthFormat(const VkPhysicalDevice& physicalDevice );
 
 	// Surface & Physical Device Helpers...
 	QueueFamilyIndices_t FindQueueFamilyIndices( const VkSurfaceKHR& surface, const VkPhysicalDevice& physicalDevice );

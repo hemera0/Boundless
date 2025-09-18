@@ -1,5 +1,3 @@
-// Small example of fully bindless rendering with glTF files...
-
 #include "Engine.hpp"
 
 std::shared_ptr<Boundless::Engine> s_Engine;
@@ -16,9 +14,9 @@ int main() {
 	s_Engine->Create();
 
 	while ( !s_Engine->ShouldExit() ) {
-		s_Engine->Tick();
-
 		glfwPollEvents();
+
+		s_Engine->Tick();
 	}
 
 	s_Engine->Destroy();

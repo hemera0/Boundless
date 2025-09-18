@@ -39,6 +39,7 @@ namespace Boundless {
 		HWND m_WindowHandle{};
 		GLFWwindow* m_GlfwWindow = nullptr;
 
+		// Vulkan Data.
 		VkInstance m_Instance = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
@@ -56,10 +57,10 @@ namespace Boundless {
 		std::vector<VkImage> m_SwapchainImages{};
 		std::vector<VkImageView> m_SwapchainImageViews{};
 
-		std::array<VkImage, MaxFramesInFlight> m_DepthImages{};
+		std::array<Image*, MaxFramesInFlight> m_DepthImages{};
 		std::array<VkImageView, MaxFramesInFlight> m_DepthImageViews{};
 
-		// Sync Objects...
+		// Vulkan Sync Objects...
 		std::vector<VkSemaphore> m_ImageAvailableSemaphores{};
 		std::vector<VkSemaphore> m_RenderFinishedSemaphores{};
 		std::vector<VkFence> m_InFlightFences{};
@@ -73,8 +74,9 @@ namespace Boundless {
 		VkCommandBuffer GetCurrentCommandBuffer() { return m_CommandBuffers[m_CurrentFrame]; }
 
 		// Shader Compilation...
-		std::unique_ptr<ShaderCompiler> m_ShaderCompiler = {};
+		ShaderCompiler m_ShaderCompiler = {};
 
+		// TODO: Move...
 		// Default Pipeline...
 		VkPipelineLayout m_DefaultPipelineLayout = VK_NULL_HANDLE;
 		VkPipeline m_DefaultPipeline = VK_NULL_HANDLE;
@@ -89,10 +91,15 @@ namespace Boundless {
 		void PushTexturesToTexturePool(const std::vector<VkImageView>& textures, VkSampler sampler);
 
 		void RenderScene(Scene& scene);
+
+		void UploadSceneMaterials(Scene& scene);
+		void UploadMaterialTextures( Scene& scene );
+
 		void UploadSceneMeshes(Scene& scene);
 		void UpdateSceneMeshData(Scene& scene);
 
-		// Temporary Buffer... (This should probably be held by the scene itself...)
+		// Temporary Buffers... (These should probably be held by the scene itself...)
 		Buffer* m_SceneUniforms = nullptr;
+		Buffer* m_SceneMaterials = nullptr;
 	};
 }
