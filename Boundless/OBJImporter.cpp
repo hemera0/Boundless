@@ -1,8 +1,6 @@
 #include "OBJImporter.hpp"
-#include <filesystem>
-
-#define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>
+#include <filesystem>
 
 Boundless::OBJImporter::OBJImporter( Scene& inScene ) : m_Scene( inScene ) { }
 

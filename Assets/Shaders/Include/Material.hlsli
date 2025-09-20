@@ -1,6 +1,7 @@
 struct Material {
 	int Index;
-
+	float3 Pad0;
+	
 	float MetallicFactor;
 	float RoughnessFactor;
 	uint AlphaMode;

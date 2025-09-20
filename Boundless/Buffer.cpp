@@ -3,64 +3,41 @@
 namespace Boundless {
     Buffer::Buffer(
         const VkDevice& device,
-        const VkPhysicalDevice& physicalDevice,
+        const VmaAllocator& allocator,
         const VkDeviceSize size,
         const VkBufferUsageFlags usage,
-        const VkMemoryPropertyFlags memoryFlags,
-        const VkSharingMode sharingMode,
-        const VkMemoryAllocateFlags allocateFlags) : m_Device(device), m_PhysicalDevice(physicalDevice), m_Size(size) {
+        const VmaMemoryUsage memoryUsage,
+        bool mappable ) : m_Device(device), m_Allocator(allocator), m_Size(size) {
+
+        VmaAllocationCreateInfo allocCreateInfo = {};
+        allocCreateInfo.usage = memoryUsage;
+        allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+        
+        if(mappable)
+            allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
         VkBufferCreateInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
         bufferInfo.size = size;
         bufferInfo.usage = usage;
-        bufferInfo.sharingMode = sharingMode;
-
-        if (vkCreateBuffer(m_Device, &bufferInfo, nullptr, &m_Handle) != VK_SUCCESS) {
-            printf("Failed to create buffer!\n");
-            return;
-        }
-
-        VkMemoryRequirements memoryRequirements{};
-        vkGetBufferMemoryRequirements(m_Device, m_Handle, &memoryRequirements);
-
-        VkMemoryAllocateInfo memoryAllocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-        memoryAllocInfo.allocationSize = memoryRequirements.size;
-        memoryAllocInfo.memoryTypeIndex = VkUtil::PhysicalDeviceFindMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, memoryFlags);
-
-        VkMemoryAllocateFlagsInfo flagsInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
-
-        if (allocateFlags != 0) {
-            flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-
-            memoryAllocInfo.pNext = &flagsInfo;
-        }
-
-        if (vkAllocateMemory(m_Device, &memoryAllocInfo, nullptr, &m_Memory) != VK_SUCCESS) {
-            printf("failed to allocate vertex buffer memory!\n");
-            return;
-        }
-
-        vkBindBufferMemory(m_Device, m_Handle, m_Memory, 0);
+        
+        vmaCreateBuffer( allocator, &bufferInfo, &allocCreateInfo, &m_Handle, &m_Allocation, nullptr );
     }
 
-    Buffer::Buffer(const VkDevice& device, const VkPhysicalDevice& physicalDevice, const Buffer::Desc& bufferDesc) : 
-        Buffer(device, physicalDevice, bufferDesc.m_Size, bufferDesc.m_Usage, bufferDesc.m_MemoryFlags, bufferDesc.m_SharingMode, bufferDesc.m_AllocateFlags) {}
+    Buffer::Buffer( const VkDevice& device, const VmaAllocator& allocator, const Buffer::Desc& bufferDesc) :
+        Buffer(device, allocator, bufferDesc.m_Size, bufferDesc.m_Usage, bufferDesc.m_MemoryUsage, bufferDesc.m_Mappable) {}
 
     Buffer::~Buffer() {
-        vkDestroyBuffer(m_Device, m_Handle, nullptr);
-        vkFreeMemory(m_Device, m_Memory, nullptr);
-
-        m_Handle = VK_NULL_HANDLE;
-        m_Memory = VK_NULL_HANDLE;
+        vmaDestroyBuffer(m_Allocator, m_Handle, m_Allocation);
     }
 
     void* Buffer::Map() {
         void* data = nullptr;
-        vkMapMemory(m_Device, m_Memory, 0, VK_WHOLE_SIZE, 0, &data);
+        vmaMapMemory(m_Allocator, m_Allocation, &data);
         return data;
     }
 
     void Buffer::Unmap() {
-        vkUnmapMemory(m_Device, m_Memory);
+        vmaUnmapMemory(m_Allocator, m_Allocation);
     }
 
     void Buffer::Patch(void* data, size_t size) {

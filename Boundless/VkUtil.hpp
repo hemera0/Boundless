@@ -1,19 +1,12 @@
 #pragma once
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <filesystem>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <windows.h>
-#include <glfw/glfw3.h>
-#include <glfw/glfw3native.h>
-#include <volk/volk.h>
+#include "Pch.hpp"
 
 // Generic Vulkan boilerplate code.
+enum class ResourceHandle : uint32_t { Invalid = 0 };
+
+using BufferHandle = ResourceHandle;
+using ImageHandle = ResourceHandle;
+
 namespace VkUtil {
 	struct QueueFamilyIndices_t {
 		uint32_t m_GraphicsFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -42,7 +35,6 @@ namespace VkUtil {
 	// Physical Device Helpers...
 	bool PhysicalDeviceIsDiscreteGPU( const VkPhysicalDevice& physicalDevice );
 	bool PhysicalDeviceHasExtensions( const VkPhysicalDevice& physicalDevice, const std::vector<const char*>& wantedExtensions );
-	uint32_t PhysicalDeviceFindMemoryType( const VkPhysicalDevice& physicalDevice, const uint32_t filter, const VkMemoryPropertyFlags propertyFlags );
 	VkFormat PhysicalDeviceFindDepthFormat(const VkPhysicalDevice& physicalDevice );
 
 	// Surface & Physical Device Helpers...
@@ -69,6 +61,7 @@ namespace VkUtil {
 	void CommandBufferBegin( const VkCommandBuffer& commandBuffer, VkCommandBufferUsageFlags flags = 0 );
 	void CommandBufferEnd( const VkCommandBuffer& commandBuffer );
 	void CommandBufferSubmit( const VkCommandBuffer& commandBuffer, const VkQueue& queue, bool wait = true );
+	void CommandBufferCopyBuffer(const VkCommandBuffer& commandBuffer, const VkBuffer& source, const VkBuffer& destination, const VkDeviceSize& size );
 	void CommandBufferCopyBufferToImage( const VkCommandBuffer& commandBuffer, const VkBuffer& buffer, const VkImage& image, uint32_t width, uint32_t height );
 	void CommandBufferImageBarrier( const VkCommandBuffer& commandBuffer, VkImage image, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkImageSubresourceRange subresourceRange );
 	void CommandBufferBufferBarrier( const VkCommandBuffer& commandBuffer, VkBuffer buffer, VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask );

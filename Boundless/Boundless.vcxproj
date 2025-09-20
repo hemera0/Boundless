@@ -65,6 +65,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3_mt.lib;dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -78,21 +79,26 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>glfw3_mt.lib;dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Device.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="GLTFImporter.cpp" />
-    <ClCompile Include="Image.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="OBJImporter.cpp" />
+    <ClCompile Include="Pch.cpp" />
     <ClCompile Include="Pipelines.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Shaders.cpp" />
@@ -101,11 +107,13 @@
   <ItemGroup>
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Camera.hpp" />
+    <ClInclude Include="Device.hpp" />
     <ClInclude Include="Engine.hpp" />
     <ClInclude Include="GLTFImporter.hpp" />
     <ClInclude Include="Image.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="OBJImporter.hpp" />
+    <ClInclude Include="Pch.hpp" />
     <ClInclude Include="Pipelines.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Shaders.hpp" />

@@ -1,8 +1,7 @@
 #include "GLTFImporter.hpp"
 
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <tinygltf/tiny_gltf.h>
+
+#include "Transform.hpp"
 
 namespace Boundless {
 	GLTFImporter::GLTFImporter( Scene& inScene ) : m_Scene(inScene) {}
@@ -61,7 +60,7 @@ namespace Boundless {
 
 			for( auto i = 0; i < accessor.count; i++ ) {
 				if ( type == "POSITION" ) {
-					mesh.m_Positions.push_back(glm::vec3( buffer[ 0 ], buffer[1], buffer[2] ));
+					mesh.m_Positions.push_back( glm::vec3( buffer[ 0 ], buffer[ 1 ], buffer[ 2 ] ) );
 				} if ( type == "NORMAL" ) {
 					mesh.m_Normals.push_back( glm::vec3( buffer[ 0 ], buffer[ 1 ], buffer[ 2 ] ) );
 				} if ( type == "TEXCOORD_0" ) {
@@ -122,10 +121,10 @@ namespace Boundless {
 			const auto& baseColorFactor = pbrMetallicRoughness.baseColorFactor;
 
 			dstMaterial.m_Albedo = glm::vec4( baseColorFactor[ 0 ], baseColorFactor[ 1 ], baseColorFactor[ 2 ], baseColorFactor[ 3 ] );
-			dstMaterial.m_Emissive = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 1.f );
+			dstMaterial.m_Emissive = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 0.f );
 
 			if ( srcMaterial.extensions.find( "KHR_materials_emissive_strength" ) != srcMaterial.extensions.cend() ) {
-				float emissiveStrength = (float)srcMaterial.extensions.at( "KHR_materials_emissive_strength" ).Get( "emissiveStrength" ).GetNumberAsDouble();
+				float emissiveStrength = static_cast<float>(srcMaterial.extensions.at( "KHR_materials_emissive_strength" ).Get( "emissiveStrength" ).GetNumberAsDouble());
 				dstMaterial.m_Emissive *= emissiveStrength;
 			}
 
@@ -140,15 +139,60 @@ namespace Boundless {
 			dstMaterial.m_EmissiveTexturePath = "";
 
 			// TODO: Better texture loading
-			if ( pbrMetallicRoughness.baseColorTexture.index > -1 )
-				dstMaterial.m_AlbedoTexturePath = m_BaseDir + model.images[model.textures[pbrMetallicRoughness.baseColorTexture.index].source].uri;
+			if ( pbrMetallicRoughness.baseColorTexture.index > -1 ) {
+				const auto& texture = model.textures[ pbrMetallicRoughness.baseColorTexture.index ];
+				
+				if(texture.sampler > -1) {
+					auto& sampler = model.samplers[ texture.sampler ];
+
+					const auto GetFilterType = [] (int filter) -> VkFilter {
+						switch(filter) {
+						case TINYGLTF_TEXTURE_FILTER_NEAREST:
+							return VK_FILTER_NEAREST;
+						case TINYGLTF_TEXTURE_FILTER_LINEAR:
+							return VK_FILTER_LINEAR;
+						}
+
+						return VK_FILTER_LINEAR;
+					};
+				
+					const auto GetRepeatType = [](int wrap) -> VkSamplerAddressMode {
+						switch(wrap) {
+						case TINYGLTF_TEXTURE_WRAP_REPEAT:
+							return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+						case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+							return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+						case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+							return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+						}
+
+						return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+					};
+
+					dstMaterial.m_AlbedoSampler = {
+						.m_MinFilter = GetFilterType( sampler.minFilter ),
+						.m_MagFilter = GetFilterType( sampler.magFilter ),
+						.m_WrapS = GetRepeatType( sampler.wrapS ),
+						.m_WrapT = GetRepeatType( sampler.wrapT )
+					};
+				} else {
+					dstMaterial.m_AlbedoSampler = {
+						.m_MinFilter = VK_FILTER_LINEAR,
+						.m_MagFilter = VK_FILTER_LINEAR,
+						.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+						.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+					};
+				}
+
+				dstMaterial.m_AlbedoTexturePath = m_BaseDir + model.images[texture.source].uri;
+			}
+
 			if ( pbrMetallicRoughness.metallicRoughnessTexture.index > -1 )
 				dstMaterial.m_MetalRoughnessTexturePath = m_BaseDir + model.images[ model.textures[ pbrMetallicRoughness.metallicRoughnessTexture.index ].source ].uri;
-		
 			if ( srcMaterial.normalTexture.index > -1 )
-				dstMaterial.m_NormalsTexture = srcMaterial.normalTexture.index;
+				dstMaterial.m_NormalsTexturePath = m_BaseDir + model.images[model.textures[srcMaterial.normalTexture.index].source].uri;
 			if ( srcMaterial.emissiveTexture.index > -1 )
-				dstMaterial.m_EmissiveTexture = srcMaterial.emissiveTexture.index;
+				dstMaterial.m_EmissiveTexturePath = m_BaseDir + model.images[model.textures[srcMaterial.emissiveTexture.index].source].uri;
 
 			m_Materials.push_back(matEntity);
 		}
@@ -169,17 +213,20 @@ namespace Boundless {
 			localTransform = glm::make_mat4(node.matrix.data());
 		} else {
 			if ( node.translation.size() == 3 ) {
-				localTransform = glm::translate(localTransform, glm::vec3(node.translation[ 0 ], node.translation[ 1 ], node.translation[ 2 ]));
+				localTransform = glm::translate(localTransform, glm::vec3( float( node.translation[ 0 ] ), float( node.translation[ 1 ] ), float( node.translation[ 2 ] ) ));
 			} if ( node.rotation.size() == 4 ) {
-				localTransform = localTransform * glm::mat4( glm::quat( node.rotation[ 3 ], node.rotation[ 0 ], node.rotation[ 1 ], node.rotation[ 2 ] ) );
+				localTransform = localTransform * glm::mat4( glm::quat( float(node.rotation[ 3 ] ), float( node.rotation[ 0 ] ), float( node.rotation[ 1 ] ), float( node.rotation[ 2 ] ) ) );
 			} if ( node.scale.size() == 3 ) {
-				localTransform = glm::scale( localTransform, glm::vec3( node.scale[ 0 ], node.scale[ 1 ], node.scale[ 2 ] ) );
+				localTransform = glm::scale( localTransform, glm::vec3( float( node.scale[ 0 ] ), float( node.scale[ 1 ] ), float( node.scale[ 2 ] ) ) );
 			}
 		}
 
 		nodeTransform *= localTransform;
 
 		// TODO: Transform components and parenting...
+		auto& transform = registry.emplace<Transform>(nodeEntity);
+
+		transform.m_WorldTransform = nodeTransform;
 
 		if( node.mesh > -1 ) {
 			const auto& mesh = model.meshes[ node.mesh ];

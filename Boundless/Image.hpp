@@ -2,7 +2,15 @@
 #include "VkUtil.hpp"
 
 namespace Boundless {
+	struct SamplerDesc {
+		VkFilter m_MinFilter{};
+		VkFilter m_MagFilter{};
+		VkSamplerAddressMode m_WrapS{};
+		VkSamplerAddressMode m_WrapT{};
+	};
+
 	class Image {
+		friend class Device;
 	public:
 		struct Desc {
 			uint32_t m_Width;
@@ -12,24 +20,14 @@ namespace Boundless {
 			VkImageTiling m_Tiling;
 			VkSampleCountFlagBits m_Samples;
 			VkImageUsageFlags m_Usage;
-			VkMemoryPropertyFlags m_Properties;
 		};
 
-		Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageCreateInfo* optionalCI = nullptr );
-		Image( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const Image::Desc& imageDesc);
-		
-		static VkImageCreateInfo GetDefault2DCreateInfo( uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkSampleCountFlagBits sampleCount, VkImageUsageFlags usage );
-
-		static Image* LoadFromFile( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const std::string& path );
-
-		void TransitionLayout( const VkCommandPool& commandPool, const VkQueue& graphicsQueue, const VkFormat format, const VkImageLayout oldLayout, const VkImageLayout newLayout );
-		void GenerateMipmaps( const VkCommandPool& commandPool, const VkQueue& graphicsQueue, uint32_t width, uint32_t height, uint32_t mipLevels );
+		VkImageView GetView() const {return m_ImageView; }
 
 		const VkFormat GetFormat() const { return m_Format; }
-		const VkImageViewType GetViewType() const { return m_ViewType; }
 
-		// const uint32_t GetLayerCount() const { return m_LayerCount; }
-		const uint32_t GetLevelCount() const { return m_LevelCount; }
+		const uint32_t GetLayers() const { return m_Layers; }
+		const uint32_t GetLevels() const { return m_Levels; }
 
 		const uint32_t GetWidth() const { return m_Width; }
 		const uint32_t GetHeight() const { return m_Height; }
@@ -38,15 +36,11 @@ namespace Boundless {
 			return m_Image;
 		}
 	private:
-		VkDevice m_Device = VK_NULL_HANDLE;
 		VkImage m_Image = VK_NULL_HANDLE;
-		VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
+		VkImageView m_ImageView = VK_NULL_HANDLE;
+		VmaAllocation m_Allocation{};
 
 		VkFormat m_Format{};
-		VkImageViewType m_ViewType{};
-
-		uint32_t m_LevelCount{};
-
-		uint32_t m_Width{}, m_Height{};
+		uint32_t m_Levels{}, m_Layers{}, m_Width{}, m_Height{};
 	};
 }

@@ -2,6 +2,7 @@
 
 struct VS_Output {
 	float4 Position : SV_POSITION;
+    float4 WorldPos : POSITION;
 	float3 Normal : NORMAL;
     float2 UV : TEXCOORD0;
 };
@@ -15,8 +16,10 @@ VS_Output main(uint VertexIndex : SV_VertexID) {
     VS_Output res;
 
     res.Position = float4(vertex.Position.xyz, 1.f);
+    res.WorldPos = res.Position;
+    
     //res.Position = mul(PushConstants.ModelMatrix, float4(vertex.Position.xyz, 1.f));
-    res.Position = mul(scene.CameraViewProjectionMatrix,  res.Position);
+    res.Position = mul(scene.CameraViewProjectionMatrix, res.Position);
     res.Normal = normalize(vertex.Normal.xyz);
     res.UV = float2(vertex.UVx, vertex.UVy);
 

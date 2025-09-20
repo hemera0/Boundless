@@ -39,8 +39,19 @@ namespace VkUtil {
 				}
 			}
 
+			VkValidationFeaturesEXT extValidationFeatures = { VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT };
+			
+			auto enableShaderPrintf = VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT;
+			auto disableUniqueHandles = VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT;
+
+			extValidationFeatures.enabledValidationFeatureCount = 1;
+			extValidationFeatures.pEnabledValidationFeatures = &enableShaderPrintf;
+			extValidationFeatures.disabledValidationFeatureCount = 1;
+			extValidationFeatures.pDisabledValidationFeatures = &disableUniqueHandles;
+
 			instanceCreateInfo.enabledLayerCount = static_cast< uint32_t >( validationLayers.size() );
 			instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+			instanceCreateInfo.pNext = &extValidationFeatures;
 		}
 
 		VkInstance ret = VK_NULL_HANDLE;
@@ -254,19 +265,6 @@ namespace VkUtil {
 		}
 
 		return static_cast< uint32_t >( wantedExtensions.size() ) == foundExts;
-	}
-
-	uint32_t PhysicalDeviceFindMemoryType( const VkPhysicalDevice& physicalDevice, const uint32_t filter, const VkMemoryPropertyFlags propertyFlags ) {
-		VkPhysicalDeviceMemoryProperties memProperties{};
-		vkGetPhysicalDeviceMemoryProperties( physicalDevice, &memProperties );
-
-		for ( uint32_t i = 0; i < memProperties.memoryTypeCount; i++ ) {
-			if ( filter & ( 1 << i ) && ( memProperties.memoryTypes[ i ].propertyFlags & propertyFlags ) == propertyFlags ) {
-				return i;
-			}
-		}
-
-		return 0u;
 	}
 
 	VkFormat PhysicalDeviceFindDepthFormat( const VkPhysicalDevice& physicalDevice ) {
@@ -558,6 +556,15 @@ namespace VkUtil {
 			vkQueueWaitIdle( queue );
 	}
 
+	void CommandBufferCopyBuffer( const VkCommandBuffer& commandBuffer, const VkBuffer& source, const VkBuffer& destination, const VkDeviceSize& size ) { 
+		VkBufferCopy bufferCopy = {};
+		bufferCopy.srcOffset = 0;
+		bufferCopy.dstOffset = 0;
+		bufferCopy.size = size;
+
+		vkCmdCopyBuffer( commandBuffer, source, destination, 1, &bufferCopy );
+	}
+
 	void CommandBufferCopyBufferToImage( const VkCommandBuffer& commandBuffer, const VkBuffer& buffer, const VkImage& image, uint32_t width, uint32_t height ) {
 		VkBufferImageCopy region{};
 		region.bufferOffset = 0;
@@ -703,9 +710,9 @@ namespace VkUtil {
 		out.rasterizerDiscardEnable = VK_FALSE;
 		out.polygonMode = VK_POLYGON_MODE_FILL;
 		out.lineWidth = 1.0f;
-		out.cullMode = VK_CULL_MODE_NONE;
+		out.cullMode = VK_CULL_MODE_BACK_BIT;
 		out.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		out.depthBiasEnable = VK_FALSE;
+		out.depthBiasEnable = VK_TRUE;
 
 		return out;
 	}

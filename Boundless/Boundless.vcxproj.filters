@@ -42,9 +42,6 @@
     <ClCompile Include="Buffer.cpp">
       <Filter>Source Files\Vulkan\Resources</Filter>
     </ClCompile>
-    <ClCompile Include="Image.cpp">
-      <Filter>Source Files\Vulkan\Resources</Filter>
-    </ClCompile>
     <ClCompile Include="Pipelines.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
@@ -68,6 +65,12 @@
     </ClCompile>
     <ClCompile Include="Mesh.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Device.cpp">
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -106,6 +109,12 @@
     </ClInclude>
     <ClInclude Include="Transform.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Pch.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Device.hpp">
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

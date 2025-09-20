@@ -1,7 +1,6 @@
 #pragma once
 #include "VkUtil.hpp"
-#include "Buffer.hpp"
-#include "Image.hpp"
+#include "Device.hpp"
 #include "Shaders.hpp"
 #include "Pipelines.hpp"
 #include "Scene.hpp"
@@ -28,6 +27,9 @@ namespace Boundless {
 
 		bool ShouldExit();
 	private:
+		void Update();
+		void Render();
+
 		constexpr static const int MaxFramesInFlight = 2;
 
 		void BeginFrame();
@@ -40,16 +42,7 @@ namespace Boundless {
 		GLFWwindow* m_GlfwWindow = nullptr;
 
 		// Vulkan Data.
-		VkInstance m_Instance = VK_NULL_HANDLE;
-		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
-		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-		VkDevice m_Device = VK_NULL_HANDLE;
-
-		VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
-		VkQueue m_PresentQueue = VK_NULL_HANDLE;
-		VkQueue m_ComputeQueue = VK_NULL_HANDLE;
-
-		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
+		std::unique_ptr<Device> m_Device{};
 		std::array<VkCommandBuffer, MaxFramesInFlight> m_CommandBuffers{};
 
 		VkExtent2D m_SwapchainExtents{};
@@ -57,7 +50,7 @@ namespace Boundless {
 		std::vector<VkImage> m_SwapchainImages{};
 		std::vector<VkImageView> m_SwapchainImageViews{};
 
-		std::array<Image*, MaxFramesInFlight> m_DepthImages{};
+		std::array<Image, MaxFramesInFlight> m_DepthImages{};
 		std::array<VkImageView, MaxFramesInFlight> m_DepthImageViews{};
 
 		// Vulkan Sync Objects...
@@ -80,26 +73,7 @@ namespace Boundless {
 		// Default Pipeline...
 		VkPipelineLayout m_DefaultPipelineLayout = VK_NULL_HANDLE;
 		VkPipeline m_DefaultPipeline = VK_NULL_HANDLE;
-
-		// Descriptors...
-		VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
-		VkDescriptorSetLayout m_TexturePoolLayout = VK_NULL_HANDLE;
-		VkDescriptorSet m_TexturePool = VK_NULL_HANDLE;
-
-		void CreateBindlessTextureDescriptorSetLayout();
-		void CreateBindlessTextureDescriptors();
-		void PushTexturesToTexturePool(const std::vector<VkImageView>& textures, VkSampler sampler);
-
-		void RenderScene(Scene& scene);
-
-		void UploadSceneMaterials(Scene& scene);
-		void UploadMaterialTextures( Scene& scene );
-
-		void UploadSceneMeshes(Scene& scene);
-		void UpdateSceneMeshData(Scene& scene);
-
-		// Temporary Buffers... (These should probably be held by the scene itself...)
-		Buffer* m_SceneUniforms = nullptr;
-		Buffer* m_SceneMaterials = nullptr;
+		
+		void RenderScene( Scene& scene );
 	};
 }

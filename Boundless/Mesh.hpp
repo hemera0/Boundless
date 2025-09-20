@@ -1,5 +1,6 @@
 #pragma once
 #include "VkUtil.hpp"
+#include "Image.hpp"
 #include "Buffer.hpp"
 
 #include <glm/glm.hpp>
@@ -25,8 +26,8 @@ namespace Boundless {
 
 		uint32_t m_Material{}; 
 
-		Buffer* m_IndexBuffer = nullptr;
-		Buffer* m_VertexBuffer = nullptr;
+		BufferHandle m_IndexBuffer{};
+		BufferHandle m_VertexBuffer{};
 
 		void PackVertexData();
 	};
@@ -40,16 +41,17 @@ namespace Boundless {
 
 	struct alignas(16) GPUMaterial {
 		int m_Index{};
+		glm::vec3 m_Pad{};
 
 		float m_MetallicFactor{};
 		float m_RoughnessFactor{};
 		EAlphaMode m_AlphaMode{};
 		float m_AlphaCutoff{};
 
-		int32_t m_AlbedoTexture{};
-		int32_t m_NormalsTexture{};
-		int32_t m_MetalRoughnessTexture{};
-		int32_t m_EmissiveTexture{};
+		ImageHandle m_AlbedoTexture{};
+		ImageHandle m_NormalsTexture{};
+		ImageHandle m_MetalRoughnessTexture{};
+		ImageHandle m_EmissiveTexture{};
 
 		glm::vec4 m_Albedo{};
 		glm::vec4 m_Emissive{};
@@ -60,6 +62,8 @@ namespace Boundless {
 		std::string m_NormalsTexturePath{};
 		std::string m_MetalRoughnessTexturePath{};
 		std::string m_EmissiveTexturePath{};
+
+		SamplerDesc m_AlbedoSampler{};
 	};
 
 	struct AnimationSampler {

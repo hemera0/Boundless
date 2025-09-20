@@ -17,8 +17,6 @@ struct SceneData {
 struct MainPassPushConstants {
     vk::BufferPointer<SceneData> Scene;
     vk::BufferPointer<Material[1]> Materials;
-    // This is a lifehack since HLSL doesn't support unsized arrays in structs...
     vk::BufferPointer<Vertex[1]> Vertices;
-
     uint MaterialIndex; 
 };
