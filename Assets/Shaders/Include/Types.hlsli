@@ -10,6 +10,7 @@ struct Vertex {
 
 struct SceneData {
     float4x4 CameraViewProjectionMatrix;
+    float4 CameraPosition;
     float4 SunDirection;
     float4 SunColor;
 };
@@ -18,6 +19,6 @@ struct MainPassPushConstants {
     vk::BufferPointer<SceneData> Scene;
     vk::BufferPointer<Material[1]> Materials;
     vk::BufferPointer<Vertex[1]> Vertices;
-    float4x4 ModelMatrix;
+    // float4x4 ModelMatrix;
     uint MaterialIndex; 
 };

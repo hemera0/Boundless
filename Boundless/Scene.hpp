@@ -9,6 +9,7 @@
 namespace Boundless {
 	struct SceneInfo {
 		glm::mat4 m_CameraViewProjectionMatrix{};
+		glm::vec4 m_CameraPosition{};
 		glm::vec4 m_SunDirection{};
 		glm::vec4 m_SunColor{};
 	};

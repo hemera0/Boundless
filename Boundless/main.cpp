@@ -14,10 +14,15 @@ int main() {
 	s_Engine = std::make_shared<Boundless::Engine>();
 	s_Engine->Create();
 
-	while ( !s_Engine->ShouldExit() ) {
-		glfwPollEvents();
+	static float oldTime = glfwGetTime();
 
-		s_Engine->Tick();
+	while ( !s_Engine->ShouldExit() ) {
+		float dt = glfwGetTime() - oldTime;
+		oldTime = glfwGetTime();
+
+		s_Engine->Tick(dt);
+
+		glfwPollEvents();
 	}
 
 	s_Engine->Destroy();

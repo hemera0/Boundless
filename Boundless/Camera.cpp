@@ -1,5 +1,6 @@
 #include "Pch.hpp"
 #include "Camera.hpp"
+#include "Input.hpp"
 #include "Engine.hpp"
 
 namespace Boundless {
@@ -54,27 +55,27 @@ namespace Boundless {
 		m_Position += ( ( forwardMove * m_Front ) + ( sideMove * m_Right ) + ( upMove * m_Up ) ) * velocity;
 	}
 
-	void Camera::Update() {
+	void Camera::Update( float dt ) {
 		// TODO: replace with proper inputs...
 		float forwardMove{}, sideMove{}, upMove{};
-		if ( GetAsyncKeyState( 'W' ) & 0x8000 )
+		if ( g_Input->GetKeyHeld( KeyCode::W ) )
 			forwardMove = 1.f;
-		if ( GetAsyncKeyState( 'S' ) & 0x8000 )
+		if ( g_Input->GetKeyHeld( KeyCode::S ) )
 			forwardMove = -1.f;
-		if ( GetAsyncKeyState( 'A' ) & 0x8000 )
+		if ( g_Input->GetKeyHeld( KeyCode::D ) )
 			sideMove = 1.f;
-		if ( GetAsyncKeyState( 'D' ) & 0x8000 )
+		if ( g_Input->GetKeyHeld( KeyCode::A ) )
 			sideMove = -1.f;
-		if( GetAsyncKeyState(VK_SPACE) & 0x8000 )
+		if( g_Input->GetKeyHeld( KeyCode::Space ) )
 			upMove = 1.f;
-		if ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 )
+		if ( g_Input->GetKeyHeld( KeyCode::LeftControl ) )
 			upMove = -1.f;
 
 		// const auto& mousePos = InputSystem::GetMousePos();
 		// UpdateMouseControls( mousePos.x, mousePos.y );
 		
 		UpdateCameraVectors();
-		UpdateMovementControls( 0.01f, forwardMove, sideMove, upMove );
+		UpdateMovementControls( dt, forwardMove, sideMove, upMove );
 
 		m_ViewMatrix = GetViewMatrix();
 		m_InvViewMatrix = glm::inverse( m_ViewMatrix );

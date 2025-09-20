@@ -31,7 +31,7 @@ namespace Boundless {
 		glm::mat4 GetProjectionMatrix() const { return m_ProjectionMatrix; }
 		glm::mat4 GetViewProjectionMatrix() const { return m_ViewProjectionMatrix; }
 
-		void Update();
+		void Update(float dt);
 	private:
 		void UpdateMouseControls( float xpos, float ypos );
 		void UpdateCameraVectors();

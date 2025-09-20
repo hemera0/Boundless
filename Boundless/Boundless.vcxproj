@@ -98,6 +98,7 @@
     <ClCompile Include="Device.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="GLTFImporter.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="OBJImporter.cpp" />
@@ -114,6 +115,7 @@
     <ClInclude Include="Engine.hpp" />
     <ClInclude Include="GLTFImporter.hpp" />
     <ClInclude Include="Image.hpp" />
+    <ClInclude Include="Input.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="OBJImporter.hpp" />
     <ClInclude Include="Pch.hpp" />

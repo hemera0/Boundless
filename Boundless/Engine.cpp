@@ -7,20 +7,30 @@
 #include "Transform.hpp" // TODO: Make components header.
 #include "Device.hpp"
 
+#include "Input.hpp"
+
 namespace Boundless {
 	Engine* Engine::s_Instance = nullptr;
 
-	struct alignas(16) PushConstants {
+	struct PushConstants {
 		VkDeviceAddress m_SceneBufferAddress;
 		VkDeviceAddress m_MaterialsBufferAddress;
 		VkDeviceAddress m_VertexBufferAddress;
-		glm::mat4 m_ModelMatrix{};
+		// glm::mat4 m_ModelMatrix{};
 		uint32_t m_MaterialIndex{};
-		char Pad[128 - 96];
+		char Pad[128 - 32];
 	};
 
 	// TODO: Fix... This shouldn't be a pointer / Makes no sense.
 	std::unique_ptr<Scene> g_MainScene{};
+
+	static void MouseCallback( GLFWwindow* window, double xpos, double ypos ) {
+		g_Input->SetMousePos( glm::vec2{ xpos, ypos } );
+	}
+
+	static void KeyCallback( GLFWwindow* window, int key, int scancode, int action, int mods ) {
+		g_Input->SetKeyState( key, action );
+	}
 
 	void Engine::Create() {
 		volkInitialize();
@@ -33,10 +43,11 @@ namespace Boundless {
 			return;
 		}
 
-		// glfwSetFramebufferSizeCallback(m_EngineGlfwWindow, &FramebufferResizeCallback);
-		// glfwSetCursorPosCallback(m_EngineGlfwWindow, &MouseCallback);
-		// glfwSetKeyCallback(m_EngineGlfwWindow, &KeyCallback);
+		// glfwSetFramebufferSizeCallback(m_GlfwWindow, &FramebufferResizeCallback);
 		// glfwSetInputMode(m_GlfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		
+		glfwSetCursorPosCallback( m_GlfwWindow, &MouseCallback);
+		glfwSetKeyCallback( m_GlfwWindow, &KeyCallback);
 		glfwSetWindowUserPointer( m_GlfwWindow, this );
 
 		m_WindowHandle = glfwGetWin32Window( m_GlfwWindow );
@@ -96,13 +107,18 @@ namespace Boundless {
 			.SetPipelineLayout( m_DefaultPipelineLayout )
 			.Build( device, m_Swapchain );
 
-
-
 		g_MainScene = std::make_unique<Scene>();
 
 		const auto& extents = m_SwapchainExtents;
 
-		auto defaultCamera = Camera::StationaryLookAtCamera( { 0.f, 0.f, 5.f }, { 0.f, 0.f, 0.f }, { 0.f, 1.f, 0.f }, 90.f, extents.width / float( extents.height ), 0.01f );
+		auto defaultCamera = Camera::StationaryLookAtCamera( 
+			{ 0.f, 0.f, 5.f }, 
+			{ 0.f, 0.f, 0.f }, 
+			{ 0.f, 1.f, 0.f }, 
+			90.f, 
+			extents.width / float( extents.height ), 
+			0.01f 
+		);
 
 		g_MainScene->SetMainCamera( defaultCamera );
 
@@ -113,7 +129,7 @@ namespace Boundless {
 		//}
 
 		GLTFImporter gltf(*g_MainScene);
-		if(!gltf.LoadFromFile("..\\Assets\\Models\\Helmet\\DamagedHelmet.gltf")) {
+		if(!gltf.LoadFromFile("..\\Assets\\Models\\Bistro\\Bistro.gltf")) {
 			printf("Failed to load gltf file\n");
 			return;
 		}
@@ -162,8 +178,8 @@ namespace Boundless {
 		vkDestroyFence( device, m_ComputeInFlightFence, nullptr );
 	}
 
-	void Engine::Tick() {
-		Update();
+	void Engine::Tick( float dt ) {
+		Update( dt );
 		Render();
 	}
 
@@ -286,9 +302,9 @@ namespace Boundless {
 		vkDestroySwapchainKHR( device, m_Swapchain, nullptr );
 	}
 
-	void Engine::Update() {
+	void Engine::Update( float dt ) {
 		auto& mainCamera = g_MainScene->GetMainCamera();
-		mainCamera.Update();
+		mainCamera.Update(dt);
 	}
 
 	void Engine::Render() {
@@ -348,8 +364,9 @@ namespace Boundless {
 
 		SceneInfo sceneInfo = {};
 		sceneInfo.m_CameraViewProjectionMatrix = camera.GetViewProjectionMatrix();
+		sceneInfo.m_CameraPosition = camera.GetInvViewMatrix()[3];
 		sceneInfo.m_SunColor = { 1.f, 1.f, 1.f, 1.f };
-		sceneInfo.m_SunDirection = glm::normalize( glm::vec4{ -1.5f, 0.f, -.075f, 1.f } );
+		sceneInfo.m_SunDirection = glm::normalize( glm::vec4{ 0.f, -1.f, -0.75f, 1.f } );
 
 		m_Device->GetBuffer( scene.GetUniformBuffer() )->Patch( &sceneInfo, sizeof( sceneInfo ) );
 
@@ -376,7 +393,7 @@ namespace Boundless {
 				sceneUniforms->GetDeviceAddress(),
 				sceneMaterials->GetDeviceAddress(),
 				vertexBuffer->GetDeviceAddress(),
-				modelMatrix,
+				// modelMatrix,
 				materialIndex
 			};
 

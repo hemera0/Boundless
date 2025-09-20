@@ -23,11 +23,11 @@ namespace Boundless {
 		void Create();
 		void Destroy();
 
-		void Tick();
+		void Tick( float dt );
 
 		bool ShouldExit();
 	private:
-		void Update();
+		void Update(float dt);
 		void Render();
 
 		constexpr static const int MaxFramesInFlight = 2;

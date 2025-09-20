@@ -1,3 +1,4 @@
+#define M_PI 3.14159265359
 float3 sRGBToLinearFast(float3 c) {
     return float3(pow(c, float3(2.2f, 2.2f, 2.2f)));
 }
