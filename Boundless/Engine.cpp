@@ -1,4 +1,4 @@
-#define VOLK_IMPLEMENTATION
+#include "Pch.hpp"
 #include "Engine.hpp"
 
 #include "OBJImporter.hpp"
@@ -10,14 +10,13 @@
 namespace Boundless {
 	Engine* Engine::s_Instance = nullptr;
 
-	struct PushConstants {
+	struct alignas(16) PushConstants {
 		VkDeviceAddress m_SceneBufferAddress;
 		VkDeviceAddress m_MaterialsBufferAddress;
 		VkDeviceAddress m_VertexBufferAddress;
-		// glm::mat4 m_ModelMatrix{};
+		glm::mat4 m_ModelMatrix{};
 		uint32_t m_MaterialIndex{};
-
-		char Pad[128 - 32];
+		char Pad[128 - 96];
 	};
 
 	// TODO: Fix... This shouldn't be a pointer / Makes no sense.
@@ -114,7 +113,7 @@ namespace Boundless {
 		//}
 
 		GLTFImporter gltf(*g_MainScene);
-		if(!gltf.LoadFromFile("..\\Assets\\Models\\Bistro\\Bistro.gltf")) {
+		if(!gltf.LoadFromFile("..\\Assets\\Models\\Helmet\\DamagedHelmet.gltf")) {
 			printf("Failed to load gltf file\n");
 			return;
 		}
@@ -362,7 +361,10 @@ namespace Boundless {
 
 			if ( Transform* transform = registry.try_get<Transform>( entity ) ) {
 				modelMatrix = transform->GetWorldTransform();
+			} else {
 			}
+			
+			modelMatrix = glm::rotate(glm::mat4(1.f), float(glfwGetTime()), {0.f, 1.f, 0.f});
 
 			uint32_t materialIndex = mesh.m_Material;
 
@@ -374,7 +376,7 @@ namespace Boundless {
 				sceneUniforms->GetDeviceAddress(),
 				sceneMaterials->GetDeviceAddress(),
 				vertexBuffer->GetDeviceAddress(),
-				// modelMatrix,
+				modelMatrix,
 				materialIndex
 			};
 

@@ -1,5 +1,5 @@
+#include "Pch.hpp"
 #include "Camera.hpp"
-#include <Windows.h>
 #include "Engine.hpp"
 
 namespace Boundless {
@@ -74,7 +74,7 @@ namespace Boundless {
 		// UpdateMouseControls( mousePos.x, mousePos.y );
 		
 		UpdateCameraVectors();
-		UpdateMovementControls( 0.1f, forwardMove, sideMove, upMove );
+		UpdateMovementControls( 0.01f, forwardMove, sideMove, upMove );
 
 		m_ViewMatrix = GetViewMatrix();
 		m_InvViewMatrix = glm::inverse( m_ViewMatrix );

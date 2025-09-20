@@ -1,6 +1,5 @@
+#include "Pch.hpp"
 #include "GLTFImporter.hpp"
-
-
 #include "Transform.hpp"
 
 namespace Boundless {

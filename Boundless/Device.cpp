@@ -1,5 +1,5 @@
+#include "Pch.hpp"
 #include "Device.hpp"
-#include <stb_image/stb_image.h>
 
 namespace Boundless {
 	Device::Device( HWND windowHandle ) { 

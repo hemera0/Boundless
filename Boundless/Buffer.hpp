@@ -22,9 +22,9 @@ namespace Boundless {
 
 		void Patch( void* data, size_t size );
 
-		const VkBuffer& GetHandle() const { return m_Handle; }
-		const VkDeviceSize GetSize() const { return m_Size; }
-		const VkDeviceAddress& GetDeviceAddress() const;
+		VkBuffer GetHandle() const { return m_Handle; }
+		VkDeviceSize GetSize() const { return m_Size; }
+		VkDeviceAddress GetDeviceAddress() const;
 
 		operator VkBuffer() const {
 			return m_Handle;

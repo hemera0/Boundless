@@ -1,3 +1,4 @@
+#include "Pch.hpp"
 #include "Buffer.hpp"
 
 namespace Boundless {
@@ -46,7 +47,7 @@ namespace Boundless {
         Unmap();
     }
 
-    const VkDeviceAddress& Buffer::GetDeviceAddress() const {
+    VkDeviceAddress Buffer::GetDeviceAddress() const {
         VkBufferDeviceAddressInfo deviceAddrInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
         deviceAddrInfo.buffer = GetHandle();
         return vkGetBufferDeviceAddress(m_Device, &deviceAddrInfo);

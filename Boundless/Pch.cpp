@@ -1,5 +1,8 @@
 #include "Pch.hpp"
 
+#define VOLK_IMPLEMENTATION
+#include <volk/volk.h>
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>
 

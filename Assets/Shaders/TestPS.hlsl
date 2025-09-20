@@ -16,7 +16,7 @@ float4 main(PS_Input input) : SV_Target0 {
 
     float4 albedo = mat.Albedo;    
     if(mat.AlbedoTexture) {
-        albedo *= sRGBToLinear( TEXTURE_SAMPLE2D(mat.AlbedoTexture, input.UV) );
+        albedo *= TEXTURE_SAMPLE2D(mat.AlbedoTexture, input.UV);
     }
 
     float4 emissive = mat.Emissive;
@@ -48,5 +48,5 @@ float4 main(PS_Input input) : SV_Target0 {
 	float3 lightDirection = float3(-0.3f, 1.f, -0.7f);
 	float diffuse = max(0.f, dot(-lightDirection, normal));
 
-    return float4( LinearTosRGB(albedo.rgb + emissive.rgb), 1.f);
+    return float4( albedo.rgb + emissive.rgb, 1.f);
 }

@@ -1,6 +1,5 @@
+#include "Pch.hpp"
 #include "OBJImporter.hpp"
-#include <tinyobjloader/tiny_obj_loader.h>
-#include <filesystem>
 
 Boundless::OBJImporter::OBJImporter( Scene& inScene ) : m_Scene( inScene ) { }
 

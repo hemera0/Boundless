@@ -1,7 +1,6 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+
 
 namespace Boundless {
 	inline glm::mat4 PerspectiveProjection(float fovY, float aspect, float nearZ) {
@@ -27,10 +26,10 @@ namespace Boundless {
 			const float aspect,
 			const float nearZ );
 
-		const glm::mat4& GetViewMatrix() const { return glm::lookAt(m_Position, m_Position + m_Front, m_Up); }
-		const glm::mat4& GetInvViewMatrix() const { return glm::inverse( GetViewMatrix() ); }
-		const glm::mat4& GetProjectionMatrix() const { return m_ProjectionMatrix; }
-		const glm::mat4& GetViewProjectionMatrix() const { return m_ViewProjectionMatrix; }
+		glm::mat4 GetViewMatrix() const { return glm::lookAt(m_Position, m_Position + m_Front, m_Up); }
+		glm::mat4 GetInvViewMatrix() const { return glm::inverse( GetViewMatrix() ); }
+		glm::mat4 GetProjectionMatrix() const { return m_ProjectionMatrix; }
+		glm::mat4 GetViewProjectionMatrix() const { return m_ViewProjectionMatrix; }
 
 		void Update();
 	private:

@@ -18,5 +18,6 @@ struct MainPassPushConstants {
     vk::BufferPointer<SceneData> Scene;
     vk::BufferPointer<Material[1]> Materials;
     vk::BufferPointer<Vertex[1]> Vertices;
+    float4x4 ModelMatrix;
     uint MaterialIndex; 
 };

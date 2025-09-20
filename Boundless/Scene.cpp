@@ -1,3 +1,4 @@
+#include "Pch.hpp"
 #include "Scene.hpp"
 #include "Engine.hpp"
 
@@ -92,7 +93,7 @@ namespace Boundless {
 			}
 
 			if ( !mat.m_EmissiveTexturePath.empty() ) {
-				Image image = device->LoadImageFromFile( mat.m_NormalsTexturePath, false );
+				Image image = device->LoadImageFromFile( mat.m_EmissiveTexturePath, false );
 				mat.m_EmissiveTexture = device->CreateTexture( image.GetView(), device->CreateSampler( mat.m_AlbedoSampler ) );
 			}
 		}
