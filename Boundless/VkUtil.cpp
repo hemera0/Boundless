@@ -206,13 +206,21 @@ namespace VkUtil {
 
 		VkPhysicalDeviceVulkan11Features features11 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES };
 		features11.shaderDrawParameters = true;
+		LOG_FEATURE( features11.shaderDrawParameters );
 
 		features12.pNext = &features11;
 
-		// Implement Descriptor Buffer.
-		// VkPhysicalDeviceDescriptorBufferFeaturesEXT featuresDescriptorBuffer = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT };
-		// featuresDescriptorBuffer.descriptorBuffer = VK_TRUE;
-		// featuresDescriptorBuffer.pNext = nullptr;
+		VkPhysicalDeviceRayQueryFeaturesKHR featuresRayQuery = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+		featuresRayQuery.rayQuery = true;
+		LOG_FEATURE( featuresRayQuery.rayQuery );
+
+		features11.pNext = &featuresRayQuery;
+
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR featuresAccelerationStructure = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+		featuresAccelerationStructure.accelerationStructure = true;
+		LOG_FEATURE( featuresAccelerationStructure.accelerationStructure );
+
+		featuresRayQuery.pNext = &featuresAccelerationStructure;
 
 		deviceCreateInfo.pNext = &features14;
 
@@ -437,7 +445,7 @@ namespace VkUtil {
 
 	VkSurfaceFormatKHR SwapchainSelectSurfaceFormat( const std::vector<VkSurfaceFormatKHR>& availableFormats ) {
 		for ( const auto& surfaceFormat : availableFormats ) {
-			if ( surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ) {
+			if ( surfaceFormat.format == VK_FORMAT_R8G8B8A8_UNORM && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ) {
 				return surfaceFormat;
 			}
 		}
@@ -607,6 +615,20 @@ namespace VkUtil {
 
 	}
 
+	void CommandBufferStageBarrier( const VkCommandBuffer& commandBuffer, VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask ) { 
+		VkMemoryBarrier2 memoryBarrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
+		memoryBarrier.srcStageMask = srcStageMask;
+		memoryBarrier.srcAccessMask = srcAccessMask;
+		memoryBarrier.dstStageMask = dstStageMask;
+		memoryBarrier.dstAccessMask = dstAccessMask;
+
+		VkDependencyInfo dependencyInfo = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+		dependencyInfo.memoryBarrierCount = 1;
+		dependencyInfo.pMemoryBarriers = &memoryBarrier;
+
+		vkCmdPipelineBarrier2( commandBuffer, &dependencyInfo );
+	}
+
 	void CommandBufferBeginRendering( const VkCommandBuffer& commandBuffer, VkRenderingInfo* renderingInfo ) {
 		vkCmdBeginRendering( commandBuffer, renderingInfo );
 	}
@@ -615,7 +637,7 @@ namespace VkUtil {
 		vkCmdEndRendering( commandBuffer );
 	}
 
-	void CommandBufferSetScissorAndViewport( const VkCommandBuffer& commandBuffer, float width, float height, float x, float y, float minDepth, float maxDepth ) {
+	void CommandBufferSetScissorAndViewport( const VkCommandBuffer& commandBuffer, float width, float height, float x, float y, float minDepth, float maxDepth, bool flip ) {
 		VkRect2D scissor{};
 		scissor.offset = { int32_t( x ), int32_t( y ) };
 		scissor.extent.width = uint32_t( width );
@@ -624,9 +646,9 @@ namespace VkUtil {
 
 		VkViewport viewport{};
 		viewport.x = x;
-		viewport.y = height;
+		viewport.y = flip ? height : y;
 		viewport.width = width;
-		viewport.height = -height; // flip y
+		viewport.height = flip ? -height : height; // flip y
 		viewport.minDepth = minDepth;
 		viewport.maxDepth = maxDepth;
 		vkCmdSetViewport( commandBuffer, 0, 1, &viewport );
@@ -657,7 +679,7 @@ namespace VkUtil {
 		depthAttachment.imageLayout = layout;
 		depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depthAttachment.clearValue.depthStencil = { 0.f, 0u };
+		depthAttachment.clearValue.depthStencil = { 1.f, 0u };
 
 		return depthAttachment;
 	}
@@ -722,7 +744,7 @@ namespace VkUtil {
 		VkPipelineDepthStencilStateCreateInfo out{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
 		out.depthTestEnable = VK_TRUE;
 		out.depthWriteEnable = VK_TRUE;
-		out.depthCompareOp = VK_COMPARE_OP_GREATER;
+		out.depthCompareOp = VK_COMPARE_OP_LESS;
 		// out.depthBoundsTestEnable = VK_FALSE;
 		// out.minDepthBounds = 0.0f;
 		// out.maxDepthBounds = 1.0f;
@@ -733,7 +755,9 @@ namespace VkUtil {
 	VkPipelineDynamicStateCreateInfo PipelineDefaultDynamicState() {
 		static std::vector<VkDynamicState> dynamicStates = {
 			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR
+			VK_DYNAMIC_STATE_SCISSOR,
+			//VK_DYNAMIC_STATE_CULL_MODE,
+			//VK_DYNAMIC_STATE_FRONT_FACE,
 		};
 
 		VkPipelineDynamicStateCreateInfo out{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };

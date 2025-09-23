@@ -8,6 +8,7 @@ namespace Boundless {
 
 		bool hasUVs = !m_Texcoords.empty();
 		bool hasNormals = !m_Normals.empty();
+		bool hasTangents = !m_Tangents.empty();
 
 		for(auto i = 0; i < m_Positions.size(); i++) {
 			MeshVertexData mvd = {};	
@@ -20,6 +21,10 @@ namespace Boundless {
 
 			if(hasNormals) {
 				mvd.m_Normal = m_Normals[i];
+			}
+
+			if(hasTangents) {
+				mvd.m_Tangent = m_Tangents[i];
 			}
 
 			m_Vertices.push_back(mvd);

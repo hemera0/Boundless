@@ -1,6 +1,9 @@
 #include "Pch.hpp"
 #include "Device.hpp"
 
+#include <ktxvulkan.h>
+#pragma comment(lib, "ktx.lib")
+
 namespace Boundless {
 	Device::Device( HWND windowHandle ) { 
 		uint32_t extensionCount = 0;
@@ -11,6 +14,9 @@ namespace Boundless {
 			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 			VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
 			VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+			VK_KHR_RAY_QUERY_EXTENSION_NAME,
+			VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
 			// VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		};
 
@@ -70,21 +76,25 @@ namespace Boundless {
 
 	void Device::CreateGlobalDescriptors() {
 		VkDescriptorSetLayoutBinding texturesDescriptorSetLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024u, VK_SHADER_STAGE_ALL };
-		VkDescriptorBindingFlags descriptorBindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+		VkDescriptorSetLayoutBinding acceleratingStructureDescriptorSetLayoutBinding = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1024u, VK_SHADER_STAGE_ALL };
+
+		std::array<VkDescriptorBindingFlags, 2> descriptorBindingFlags = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT };
+		std::array< VkDescriptorSetLayoutBinding, 2> bindings = { texturesDescriptorSetLayoutBinding, acceleratingStructureDescriptorSetLayoutBinding };
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetLayoutBindingFlags = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
-		descriptorSetLayoutBindingFlags.pBindingFlags = &descriptorBindingFlags;
-		descriptorSetLayoutBindingFlags.bindingCount = 1;
+		descriptorSetLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
+		descriptorSetLayoutBindingFlags.bindingCount = uint32_t( descriptorBindingFlags.size() );
 
 		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 		descriptorSetLayoutCreateInfo.pNext = &descriptorSetLayoutBindingFlags;
-		descriptorSetLayoutCreateInfo.bindingCount = 1;
-		descriptorSetLayoutCreateInfo.pBindings = &texturesDescriptorSetLayoutBinding;
+		descriptorSetLayoutCreateInfo.bindingCount = uint32_t( bindings.size() );
+		descriptorSetLayoutCreateInfo.pBindings = bindings.data();
 
 		vkCreateDescriptorSetLayout( m_Device, &descriptorSetLayoutCreateInfo, nullptr, &m_TexturePoolLayout );
 
 		VkDescriptorPoolSize descriptorPoolSizes[ ] = {
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1024 },
 		};
 
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
@@ -108,7 +118,7 @@ namespace Boundless {
 		Image res = {};
 
 		VkImageCreateInfo createInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-		createInfo.imageType = VK_IMAGE_TYPE_2D;
+		createInfo.imageType = imageDesc.m_Type;
 		createInfo.extent.width = imageDesc.m_Width;
 		createInfo.extent.height = imageDesc.m_Height;
 		createInfo.extent.depth = 1;
@@ -341,6 +351,7 @@ namespace Boundless {
 
 		Image image = CreateImage(
 			Image::Desc {
+				.m_Type = VK_IMAGE_TYPE_2D,
 				.m_Width = uint32_t(width),
 				.m_Height = uint32_t(height),
 				.m_Levels = mipLevels,
@@ -350,14 +361,6 @@ namespace Boundless {
 				.m_Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
 			}
 		);
-
-		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		textureView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		textureView.format = image.GetFormat();
-		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
-		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-
-		image.m_ImageView = VkUtil::CreateImageView( m_Device, image, &textureView );
 
 		// Vulkan tutorial talks about using transition layout to go to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
 		// But we can just set this for the VkImageView in the Descriptor.
@@ -377,7 +380,64 @@ namespace Boundless {
 
 		GenerateMipmaps( image.m_Image, width, height, mipLevels );
 
+		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		textureView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		textureView.format = image.GetFormat();
+		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1 };
+
+		image.m_ImageView = VkUtil::CreateImageView( m_Device, image, &textureView );
+
 		return image;
+	}
+
+	Image Device::LoadKTXImageFromFile( const std::string& path ) {
+		ktxVulkanDeviceInfo deviceInfo = {};
+
+		ktx_error_code_e result = ktxVulkanDeviceInfo_Construct( &deviceInfo, m_PhysicalDevice, m_Device, m_GraphicsQueue, m_CommandPool, nullptr );
+		if ( result != ktx_error_code_e::KTX_SUCCESS )
+			return {};
+
+		ktxTexture* kTexture = nullptr;
+		result = ktxTexture_CreateFromNamedFile( path.c_str(), KTX_TEXTURE_CREATE_NO_FLAGS, &kTexture );
+		if ( result != ktx_error_code_e::KTX_SUCCESS )
+			return {};
+
+		// This gets mad if you don't encode/save the .ktx file in a format Vulkan likes
+		ktxVulkanTexture texture = {};
+		result = ktxTexture_VkUploadEx(
+			kTexture,
+			&deviceInfo,
+			&texture,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+
+		if ( result != ktx_error_code_e::KTX_SUCCESS )
+			return {};
+
+		// After loading all textures you don't need these anymore
+		ktxTexture_Destroy( kTexture );
+		ktxVulkanDeviceInfo_Destruct( &deviceInfo );
+
+		Image res = {};
+		res.m_Format = texture.imageFormat;
+		res.m_Levels = texture.levelCount;
+		res.m_Layers = texture.layerCount;
+		res.m_Width = texture.width;
+		res.m_Height = texture.height;
+		res.m_Image = texture.image;
+
+		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		textureView.viewType = texture.viewType;
+		textureView.format = texture.imageFormat;
+		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, texture.levelCount, 0, texture.layerCount };
+
+		res.m_ImageView = VkUtil::CreateImageView( m_Device, res.m_Image, &textureView );
+
+		return res;
 	}
 
 	VkCommandBuffer Device::CreateCommandBuffer() {
@@ -401,12 +461,11 @@ namespace Boundless {
 		samplerInfo.mipLodBias = 0;
 		samplerInfo.minLod = 0.f;
 		samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
-		samplerInfo.anisotropyEnable = VK_TRUE;
+		samplerInfo.anisotropyEnable = samplerDesc.m_Anisotropic;
 		samplerInfo.maxAnisotropy = 16.f;
-		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		samplerInfo.compareEnable = VK_FALSE;
-		samplerInfo.compareOp = VK_COMPARE_OP_LESS;
-		samplerInfo.unnormalizedCoordinates = VK_FALSE;
+		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+		samplerInfo.compareEnable = VK_TRUE;
+		samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
 		samplerInfo.pNext = nullptr;
 
 		VkSampler sampler = VK_NULL_HANDLE;

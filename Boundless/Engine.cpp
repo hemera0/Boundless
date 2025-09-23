@@ -16,9 +16,15 @@ namespace Boundless {
 		VkDeviceAddress m_SceneBufferAddress;
 		VkDeviceAddress m_MaterialsBufferAddress;
 		VkDeviceAddress m_VertexBufferAddress;
+		// uint32_t m_TLASIndex{};
 		// glm::mat4 m_ModelMatrix{};
 		uint32_t m_MaterialIndex{};
 		char Pad[128 - 32];
+	};
+
+	struct FullscreenPushConstants {
+		int FrameBufferTexture;
+		char Pad[128 - 4];
 	};
 
 	// TODO: Fix... This shouldn't be a pointer / Makes no sense.
@@ -44,8 +50,7 @@ namespace Boundless {
 		}
 
 		// glfwSetFramebufferSizeCallback(m_GlfwWindow, &FramebufferResizeCallback);
-		// glfwSetInputMode(m_GlfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		
+		glfwSetInputMode(m_GlfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		glfwSetCursorPosCallback( m_GlfwWindow, &MouseCallback);
 		glfwSetKeyCallback( m_GlfwWindow, &KeyCallback);
 		glfwSetWindowUserPointer( m_GlfwWindow, this );
@@ -100,11 +105,34 @@ namespace Boundless {
 		const auto depthFormat = VkUtil::PhysicalDeviceFindDepthFormat( physicalDevice );
 		const auto imageFormat = VkUtil::SwapchainGetImageFormat( physicalDevice, surface );
 
+		auto MSAAState = VkUtil::PipelineDefaultMultiSampleState();
+		MSAAState.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT;
+
 		m_DefaultPipeline = PipelineBuilder{}
 			.SetShaderBlobs( { { psBlob, VK_SHADER_STAGE_FRAGMENT_BIT }, { vsBlob, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetColorAttachmentFormats( { imageFormat } )
+			.SetColorAttachmentFormats( { VK_FORMAT_R32G32B32A32_SFLOAT } )
 			.SetDepthAttachmentFormat( depthFormat )
 			.SetPipelineLayout( m_DefaultPipelineLayout )
+			.SetMultisampleState( MSAAState )
+			.Build( device, m_Swapchain );
+
+		auto fullscreenPsBlob = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\ComposePS.hlsl", ShaderType::PixelShader );
+		auto fullscreenVsBlob = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\FullscreenVS.hlsl", ShaderType::VertexShader );
+
+		m_FullscreenPipelineLayout = PipelineLayoutBuilder()
+			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( FullscreenPushConstants ) } } )
+			.SetDescriptorSets( { m_Device->GetTexturePoolLayout() } )
+			.Build( device );
+
+		auto fullscreenRasterization = VkUtil::PipelineDefaultRasterizationState();
+		fullscreenRasterization.cullMode = VK_CULL_MODE_FRONT_BIT;
+		fullscreenRasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+		m_FullscreenPipeline = PipelineBuilder{}
+			.SetShaderBlobs( { { fullscreenPsBlob, VK_SHADER_STAGE_FRAGMENT_BIT }, { fullscreenVsBlob, VK_SHADER_STAGE_VERTEX_BIT } } )
+			.SetRasterizationState( fullscreenRasterization )
+			.SetColorAttachmentFormats( { imageFormat } )
+			.SetPipelineLayout( m_FullscreenPipelineLayout )
 			.Build( device, m_Swapchain );
 
 		g_MainScene = std::make_unique<Scene>();
@@ -117,7 +145,7 @@ namespace Boundless {
 			{ 0.f, 1.f, 0.f }, 
 			90.f, 
 			extents.width / float( extents.height ), 
-			0.01f 
+			0.1f 
 		);
 
 		g_MainScene->SetMainCamera( defaultCamera );
@@ -129,10 +157,26 @@ namespace Boundless {
 		//}
 
 		GLTFImporter gltf(*g_MainScene);
-		if(!gltf.LoadFromFile("..\\Assets\\Models\\Bistro\\Bistro.gltf")) {
+		if(!gltf.LoadFromFile("..\\Assets\\Models\\Sponza\\Sponza.gltf")) {
 			printf("Failed to load gltf file\n");
 			return;
 		}
+
+		Image diffuseTex = m_Device->LoadKTXImageFromFile( "..\\Assets\\IBL\\Inside\\diffuse.ktx2" );
+		Image specularTex = m_Device->LoadKTXImageFromFile( "..\\Assets\\IBL\\Inside\\specular.ktx2" );
+
+		VkSampler sampler = m_Device->CreateSampler( 
+			SamplerDesc {
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			});
+
+		m_DiffuseIbl = m_Device->CreateTexture( diffuseTex.GetView(), sampler );
+		m_SpecularIbl = m_Device->CreateTexture( specularTex.GetView(), sampler );
+
+		GenerateBrdfLut();
 
 		g_MainScene->OnDeviceStart(m_Device);
 
@@ -259,13 +303,14 @@ namespace Boundless {
 		const auto depthFormat = VkUtil::PhysicalDeviceFindDepthFormat( m_Device->GetPhysicalDevice() );
 		for(auto i = 0; i < m_DepthImages.size(); i++) {
 			m_DepthImages[i] = m_Device->CreateImage( Image::Desc{
+					.m_Type = VK_IMAGE_TYPE_2D,
 					.m_Width = m_SwapchainExtents.width,
 					.m_Height = m_SwapchainExtents.height,
 					.m_Levels = 1,
 					.m_Format = depthFormat,
 					.m_Tiling = VK_IMAGE_TILING_OPTIMAL,
-					.m_Samples = VK_SAMPLE_COUNT_1_BIT,
-					.m_Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+					.m_Samples = VK_SAMPLE_COUNT_8_BIT,
+					.m_Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 				} );
 
 			VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
@@ -277,6 +322,140 @@ namespace Boundless {
 
 			m_DepthImageViews[i] = VkUtil::CreateImageView(m_Device->GetDevice(), m_DepthImages[i], &textureView);
 		}
+
+		VkFormat hdrFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+		m_HDRFrameBuffer = m_Device->CreateImage(Image::Desc{
+			.m_Type = VK_IMAGE_TYPE_2D,
+			.m_Width = m_SwapchainExtents.width,
+			.m_Height = m_SwapchainExtents.height,
+			.m_Levels = 1,
+			.m_Format = hdrFormat,
+			.m_Tiling = VK_IMAGE_TILING_OPTIMAL,
+			.m_Samples = VK_SAMPLE_COUNT_1_BIT,
+			.m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		});
+
+		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		textureView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		textureView.format = hdrFormat;
+		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		m_HDRFrameBuffer.m_ImageView = VkUtil::CreateImageView( m_Device->GetDevice(), m_HDRFrameBuffer, &textureView );
+
+		VkSampler sampler = m_Device->CreateSampler(
+			SamplerDesc{
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			} );
+
+		m_HdrHandle = m_Device->CreateTexture( m_HDRFrameBuffer.m_ImageView, sampler );
+
+		m_MSAAFrameBuffer = m_Device->CreateImage( Image::Desc{
+			.m_Type = VK_IMAGE_TYPE_2D,
+			.m_Width = m_SwapchainExtents.width,
+			.m_Height = m_SwapchainExtents.height,
+			.m_Levels = 1,
+			.m_Format = hdrFormat,
+			.m_Tiling = VK_IMAGE_TILING_OPTIMAL,
+			.m_Samples = VK_SAMPLE_COUNT_8_BIT,
+			.m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			} );
+
+		m_MSAAFrameBuffer.m_ImageView = VkUtil::CreateImageView( m_Device->GetDevice(), m_MSAAFrameBuffer, &textureView );
+	}
+
+	void Engine::GenerateBrdfLut() {
+		VkFormat brdfFormat = VK_FORMAT_R16G16_SFLOAT;
+		const int lutDim = 512;
+
+		Image brdfTex = m_Device->CreateImage( Image::Desc {
+				.m_Type = VK_IMAGE_TYPE_2D,
+				.m_Width = lutDim,
+				.m_Height = lutDim,
+				.m_Levels = 1,
+				.m_Format = brdfFormat,
+				.m_Tiling = VK_IMAGE_TILING_OPTIMAL,
+				.m_Samples = VK_SAMPLE_COUNT_1_BIT,
+				.m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			} );
+		
+		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+		textureView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		textureView.format = brdfFormat;
+		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+		brdfTex.m_ImageView = VkUtil::CreateImageView( m_Device->GetDevice(), brdfTex, &textureView );
+
+		auto psBlob = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\IBL\\BRDFGenPS.hlsl", ShaderType::PixelShader );
+		auto vsBlob = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\FullscreenVS.hlsl", ShaderType::VertexShader );
+
+		VkPipelineLayout brdfLutGenPipelineLayout = PipelineLayoutBuilder()
+			// .SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( FullscreenPushConstants ) } } )
+			.SetDescriptorSets( { m_Device->GetTexturePoolLayout() } )
+			.Build( m_Device->GetDevice() );
+
+		auto fullscreenRasterization = VkUtil::PipelineDefaultRasterizationState();
+		fullscreenRasterization.cullMode = VK_CULL_MODE_FRONT_BIT;
+		fullscreenRasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+		VkPipeline brdfLutGenPipeline = PipelineBuilder{}
+			.SetShaderBlobs( { { psBlob, VK_SHADER_STAGE_FRAGMENT_BIT }, { vsBlob, VK_SHADER_STAGE_VERTEX_BIT } } )
+			.SetRasterizationState( fullscreenRasterization )
+			.SetColorAttachmentFormats( { brdfFormat } )
+			.SetPipelineLayout( brdfLutGenPipelineLayout )
+			.Build( m_Device->GetDevice(), m_Swapchain );
+
+		VkCommandBuffer commandBuffer = m_Device->CreateCommandBuffer();
+
+		VkUtil::CommandBufferBegin( commandBuffer );
+
+		VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
+		VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( brdfTex.GetView(), &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
+		VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( VkExtent2D{ lutDim, lutDim }, &colorAttachment, nullptr );
+
+		VkUtil::CommandBufferBeginRendering( commandBuffer, &renderingInfo );
+		VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, float( lutDim ), float(lutDim), 0.f, 0.f, 0.f, 1.f, false );
+
+		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, brdfLutGenPipeline );
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0 );
+
+		VkUtil::CommandBufferEndRendering(commandBuffer);
+
+		VkUtil::CommandBufferImageBarrier(
+			commandBuffer,
+			brdfTex,
+			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+		);
+
+		VkUtil::CommandBufferEnd(commandBuffer);
+		VkUtil::CommandBufferSubmit(commandBuffer, m_Device->GetGraphicsQueue());
+		
+		VkSampler sampler = m_Device->CreateSampler(
+			SamplerDesc{
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_Anisotropic = false
+			} );
+
+		m_BrdfLut = m_Device->CreateTexture( brdfTex.GetView(), sampler );
+
+		vkFreeCommandBuffers(m_Device->GetDevice(), m_Device->GetCommandPool(), 1, &commandBuffer);
+	
+		vkDestroyPipelineLayout( m_Device->GetDevice(), brdfLutGenPipelineLayout, nullptr );
+		vkDestroyPipeline(m_Device->GetDevice(), brdfLutGenPipeline, nullptr);
 	}
 
 	void Engine::DestroyFrameSizeDependantResources() {
@@ -311,45 +490,88 @@ namespace Boundless {
 		BeginFrame();
 
 		{
-			VkImage currentImage = m_SwapchainImages[ m_CurrentImageIndex ];
-			VkImageView currentView = m_SwapchainImageViews[ m_CurrentImageIndex ];
-
-			VkImage depthImage = m_DepthImages[ m_CurrentFrame ];
-			VkImageView depthImageView = m_DepthImageViews[ m_CurrentFrame ];
-
-			VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-			VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( currentView, &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
-			VkRenderingAttachmentInfo depthAttachment = VkUtil::RenderPassGetDepthAttachmentInfo( depthImageView, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
-
-			const auto& extents = m_SwapchainExtents;
-
-			VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( extents, &colorAttachment, &depthAttachment );
-
 			const auto& commandBuffer = GetCurrentCommandBuffer();
 
-			VkUtil::CommandBufferBeginRendering( commandBuffer, &renderingInfo );
-			VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, static_cast< float >( extents.width ), static_cast< float >( extents.height ) );
+			static bool tlasRebuild = true;
+			if( tlasRebuild ) {
+				g_MainScene->BuildTLAS( m_Device, commandBuffer );
+				tlasRebuild = false;
+			}
 
-			VkDescriptorSet texturePool = m_Device->GetTexturePool();
+			{
+				VkImageView depthImageView = m_DepthImageViews[ m_CurrentFrame ];
+				VkImageView frameBuffer = m_HDRFrameBuffer.m_ImageView;
+				VkImageView msaaFrameBuffer = m_MSAAFrameBuffer.m_ImageView;
 
-			vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DefaultPipeline );
-			vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DefaultPipelineLayout, 0, 1, &texturePool, 0, nullptr );
+				VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
+				VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( msaaFrameBuffer, &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, VK_RESOLVE_MODE_AVERAGE_BIT, frameBuffer, VK_IMAGE_LAYOUT_GENERAL );
+				VkRenderingAttachmentInfo depthAttachment = VkUtil::RenderPassGetDepthAttachmentInfo( depthImageView, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
+				VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, &depthAttachment );
 
-			RenderScene( *g_MainScene );
+				VkUtil::CommandBufferBeginRendering( commandBuffer, &renderingInfo );
+				VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, static_cast< float >( m_SwapchainExtents.width ), static_cast< float >( m_SwapchainExtents.height ), 0.f, 0.f, 0.f, 1.f );
 
-			VkUtil::CommandBufferEndRendering( commandBuffer );
+				VkDescriptorSet texturePool = m_Device->GetTexturePool();
 
-			VkUtil::CommandBufferImageBarrier(
-				commandBuffer,
-				currentImage,
-				VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-				0,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-			);
+				vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DefaultPipeline );
+				vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_DefaultPipelineLayout, 0, 1, &texturePool, 0, nullptr );
+
+
+
+				RenderScene( *g_MainScene );
+
+				VkUtil::CommandBufferEndRendering( commandBuffer );
+
+				VkUtil::CommandBufferImageBarrier(
+					commandBuffer,
+					m_HDRFrameBuffer,
+					VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+					VK_ACCESS_SHADER_READ_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+				);
+			}
+
+			{
+				VkImage currentImage = m_SwapchainImages[ m_CurrentImageIndex ];
+				VkImageView currentView = m_SwapchainImageViews[ m_CurrentImageIndex ];
+
+				VkClearValue clearValue = { { 1.f, 0.1f, 0.1f, 1.f } };
+				VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( currentView, &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
+				VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, nullptr );
+
+				VkUtil::CommandBufferBeginRendering( commandBuffer, &renderingInfo );
+				VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, static_cast< float >( m_SwapchainExtents.width ), static_cast< float >( m_SwapchainExtents.height ), 0.f, 0.f, 0.f, 1.f, false );
+
+				VkDescriptorSet texturePool = m_Device->GetTexturePool();
+
+				// vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
+				// vkCmdSetFrontFace( commandBuffer, VK_FRONT_FACE_COUNTER_CLOCKWISE );
+				vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_FullscreenPipeline );
+				vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_FullscreenPipelineLayout, 0, 1, &texturePool, 0, nullptr );
+				
+				FullscreenPushConstants pc = { .FrameBufferTexture = int(m_HdrHandle) };
+
+				vkCmdPushConstants( commandBuffer, m_FullscreenPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( FullscreenPushConstants ), &pc );
+				vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
+
+				VkUtil::CommandBufferEndRendering( commandBuffer );
+			
+				VkUtil::CommandBufferImageBarrier(
+					commandBuffer,
+					currentImage,
+					VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+					0,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+					VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+				);
+			}
 		}
 
 		EndFrame();
@@ -366,7 +588,8 @@ namespace Boundless {
 		sceneInfo.m_CameraViewProjectionMatrix = camera.GetViewProjectionMatrix();
 		sceneInfo.m_CameraPosition = camera.GetInvViewMatrix()[3];
 		sceneInfo.m_SunColor = { 1.f, 1.f, 1.f, 1.f };
-		sceneInfo.m_SunDirection = glm::normalize( glm::vec4{ 0.f, -1.f, -0.75f, 1.f } );
+		sceneInfo.m_SunDirection = glm::normalize( glm::vec4{ 0.25f, -0.9f, 0.f, 1.f } );
+		sceneInfo.m_IblTextures = { m_DiffuseIbl, m_SpecularIbl, m_BrdfLut, 0 };
 
 		m_Device->GetBuffer( scene.GetUniformBuffer() )->Patch( &sceneInfo, sizeof( sceneInfo ) );
 
@@ -393,6 +616,7 @@ namespace Boundless {
 				sceneUniforms->GetDeviceAddress(),
 				sceneMaterials->GetDeviceAddress(),
 				vertexBuffer->GetDeviceAddress(),
+				
 				// modelMatrix,
 				materialIndex
 			};

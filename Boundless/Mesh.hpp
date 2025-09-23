@@ -12,6 +12,7 @@ namespace Boundless {
 		float m_UVx{};
 		glm::vec3 m_Normal{};
 		float m_UVy{};
+		glm::vec4 m_Tangent{};
 	};
 
 	struct Mesh {
@@ -20,6 +21,7 @@ namespace Boundless {
 		std::vector<glm::vec3> m_Positions{};
 		std::vector<glm::vec3> m_Normals{};
 		std::vector<glm::vec2> m_Texcoords{};
+		std::vector<glm::vec4> m_Tangents{};
 
 		std::vector<uint32_t> m_Indices{};
 		std::vector<MeshVertexData> m_Vertices{};
@@ -28,6 +30,8 @@ namespace Boundless {
 
 		BufferHandle m_IndexBuffer{};
 		BufferHandle m_VertexBuffer{};
+		BufferHandle m_BlasBuffer{};
+		VkAccelerationStructureKHR m_Blas{};
 
 		void PackVertexData();
 	};
@@ -43,8 +47,8 @@ namespace Boundless {
 		int m_Index{};
 		glm::vec3 m_Pad{};
 
-		float m_MetallicFactor{};
-		float m_RoughnessFactor{};
+		float m_MetallicFactor{ 1.f };
+		float m_RoughnessFactor{ 1.f };
 		EAlphaMode m_AlphaMode{};
 		float m_AlphaCutoff{};
 
@@ -53,8 +57,8 @@ namespace Boundless {
 		ImageHandle m_MetalRoughnessTexture{};
 		ImageHandle m_EmissiveTexture{};
 
-		glm::vec4 m_Albedo{};
-		glm::vec4 m_Emissive{};
+		glm::vec4 m_Albedo{1.f, 1.f, 1.f, 1.f};
+		glm::vec4 m_Emissive{0.f, 0.f, 0.f, 1.f};
 	};
 
 	struct alignas( 16 ) Material : GPUMaterial {

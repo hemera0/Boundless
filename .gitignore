@@ -410,8 +410,8 @@ FodyWeavers.xsd
 # Built Visual Studio Code Extensions
 *.vsix
 
-
 Assets/Models/
+Assets/IBL/
 
 # Windows Installer files from build outputs
 *.cab

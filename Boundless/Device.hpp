@@ -14,6 +14,7 @@ namespace Boundless {
 
 		Image CreateImage( const Image::Desc& imageDesc );
 		ImageHandle CreateTexture( const VkImageView& texture, const VkSampler& sampler );
+		
 		BufferHandle CreateBuffer( const Buffer::Desc& bufferDesc );
 		Buffer* GetBuffer( BufferHandle handle );
 
@@ -42,6 +43,7 @@ namespace Boundless {
 		void GenerateMipmaps( const VkImage& image, uint32_t width, uint32_t height, uint32_t mipLevels );
 
 		Image LoadImageFromFile( const std::string& path, bool isSRGB );
+		Image LoadKTXImageFromFile( const std::string& path );
 
 		VkCommandBuffer CreateCommandBuffer();
 	private:
@@ -63,6 +65,9 @@ namespace Boundless {
 		VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSetLayout m_TexturePoolLayout = VK_NULL_HANDLE;
 		VkDescriptorSet m_TexturePool = VK_NULL_HANDLE;
+
+		// VkDescriptorSetLayout m_ASPoolLayout = VK_NULL_HANDLE;
+		// VkDescriptorSet m_ASPool = VK_NULL_HANDLE;
 
 		std::vector<VkImageView> m_AllTextures{ VK_NULL_HANDLE };
 		std::vector<Buffer*> m_AllBuffers{ nullptr };

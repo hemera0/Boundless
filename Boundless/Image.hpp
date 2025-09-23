@@ -7,12 +7,14 @@ namespace Boundless {
 		VkFilter m_MagFilter{};
 		VkSamplerAddressMode m_WrapS{};
 		VkSamplerAddressMode m_WrapT{};
+		bool m_Anisotropic{true};
 	};
 
 	class Image {
 		friend class Device;
 	public:
 		struct Desc {
+			VkImageType m_Type;
 			uint32_t m_Width;
 			uint32_t m_Height;
 			uint32_t m_Levels;
@@ -35,9 +37,10 @@ namespace Boundless {
 		operator VkImage() {
 			return m_Image;
 		}
+
+		VkImageView m_ImageView = VK_NULL_HANDLE;
 	private:
 		VkImage m_Image = VK_NULL_HANDLE;
-		VkImageView m_ImageView = VK_NULL_HANDLE;
 		VmaAllocation m_Allocation{};
 
 		VkFormat m_Format{};

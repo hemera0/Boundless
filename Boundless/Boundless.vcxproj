@@ -44,12 +44,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>..\Dependencies\include;$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\KTX-Software\include;..\Dependencies\include;$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\KTX-Software\lib;..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>..\Dependencies\include;$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\KTX-Software\include;..\Dependencies\include;$(VULKAN_SDK)\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\KTX-Software\lib;..\Dependencies\lib;$(VULKAN_SDK)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -104,6 +104,7 @@
     <ClCompile Include="OBJImporter.cpp" />
     <ClCompile Include="Pch.cpp" />
     <ClCompile Include="Pipelines.cpp" />
+    <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="VkUtil.cpp" />
@@ -120,6 +121,7 @@
     <ClInclude Include="OBJImporter.hpp" />
     <ClInclude Include="Pch.hpp" />
     <ClInclude Include="Pipelines.hpp" />
+    <ClInclude Include="RenderGraph.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Shaders.hpp" />
     <ClInclude Include="Transform.hpp" />

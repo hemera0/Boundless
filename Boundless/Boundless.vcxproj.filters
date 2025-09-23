@@ -75,6 +75,9 @@
     <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RenderGraph.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.hpp">
@@ -121,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderGraph.hpp">
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

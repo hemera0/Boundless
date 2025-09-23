@@ -7,8 +7,12 @@ float DistributionGGX(float NdotH, float roughness) {
     return alphaSq / (M_PI * denom * denom) + 0.001f;
 }
 
-float3 FresnelSchlick(float3 f0, float f90, float NdotV) {
-    return f0 + (f90 - f0) * pow(1.f - NdotV, 5.f);
+float3 FresnelSchlick(float3 F0, float F90, float NdotV) {
+    return F0 + (F90 - F0) * pow(1.f - NdotV, 5.f);
+}
+
+float3 FresnelSchlickRoughness(float3 F0, float NdotV, float roughness) {
+    return F0 + (max(float3(1.0.xxx - roughness), F0) - F0) * pow(clamp(1.0 - NdotV, 0.0, 1.0), 5.0);
 }
 
 float GGX_Schlick(float NdotV, float roughness) {
@@ -49,13 +53,48 @@ struct PBRMaterial {
         float   D = DistributionGGX(NdotH, m_Roughness);
         float   G = GeometrySmith(NdotV, NdotL, m_Roughness);
         
+        float3 kd = (1.0 - F) * (1.0 - m_Metallic);
         float3 specular = (F * D * G) / 4.f * NdotL * NdotV + 0.001f;
-        float3 diffuse  = ((1.f - m_Metallic) * m_Albedo) * (1.f - F);
+        float3 diffuse = ( kd * m_Albedo );
+
         return diffuse + specular;
     }
 
-    float3 CalculateDirectionalLight(float3 wi, float3 wo, float3 lightColor) {
+    float3 CalculateDirectionalLight(float3 wi, float3 wo, float3 lightColor, bool rayHit) {
         float NdotL = max(0.f, dot(m_Normal, wi)); 
+
+        NdotL *= rayHit ? 0.1f : 1.f;
+
 		return EvalBRDF(wi, wo) * NdotL * lightColor;
+    }
+
+    // TODO: Swap this out for some real GI...
+    // Theres a lot of stuff that causes issues with this...
+    float3 CalculateIndirectLight(SamplerState iblSampler, SamplerState brdfSampler, TextureCube diffuseMap, TextureCube specularMap, Texture2D<float4> brdfLut, float3 wo) {
+        float3 diffuseColor = m_Albedo * (1.0 - 0.04f) * (1.0 - m_Metallic);
+        float3 F0 = lerp(0.04f, m_Albedo, m_Metallic);
+    
+        float NdotV = max(0.f, dot(m_Normal, wo));
+
+        float2 brdf = brdfLut.Sample(brdfSampler, float2(NdotV, m_Roughness)).xy;
+        
+        uint width, height, specularTextureLevels;
+        specularMap.GetDimensions(0, width, height, specularTextureLevels);
+
+        float lod = m_Roughness * ( specularTextureLevels );
+
+        float3 R = normalize( reflect(-wo, m_Normal) );
+        float3 radiance = specularMap.SampleLevel(iblSampler, R, lod).xyz;
+        float3 irradiance = diffuseMap.SampleLevel(iblSampler, m_Normal, 0).xyz;
+
+        float3 ks = FresnelSchlickRoughness(F0, NdotV, m_Roughness);
+        float3 FssEss = ks * brdf.x + brdf.y;
+
+        float Ems = (1.0 - (brdf.x + brdf.y));
+        float3 F_avg = F0 + (1.0 - F0) / 21.0;
+        float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
+        float3 kd = diffuseColor * (1.0 - FssEss - FmsEms);
+        
+        return FssEss * radiance + (FmsEms + kd) * irradiance;
     }
 };

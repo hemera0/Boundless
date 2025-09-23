@@ -47,8 +47,13 @@ namespace Boundless {
 
 		VkExtent2D m_SwapchainExtents{};
 		VkSwapchainKHR m_Swapchain = VK_NULL_HANDLE;
+
 		std::vector<VkImage> m_SwapchainImages{};
 		std::vector<VkImageView> m_SwapchainImageViews{};
+
+		Image m_HDRFrameBuffer{};
+		Image m_MSAAFrameBuffer{};
+		ImageHandle m_HdrHandle = {};
 
 		std::array<Image, MaxFramesInFlight> m_DepthImages{};
 		std::array<VkImageView, MaxFramesInFlight> m_DepthImageViews{};
@@ -74,6 +79,16 @@ namespace Boundless {
 		VkPipelineLayout m_DefaultPipelineLayout = VK_NULL_HANDLE;
 		VkPipeline m_DefaultPipeline = VK_NULL_HANDLE;
 		
+		VkPipelineLayout m_FullscreenPipelineLayout = VK_NULL_HANDLE;
+		VkPipeline m_FullscreenPipeline = VK_NULL_HANDLE;
+
+		void GenerateBrdfLut();
+
+		ImageHandle m_BrdfLut = {};
+		ImageHandle m_DiffuseIbl = {};
+		ImageHandle m_SpecularIbl = {};
+
+
 		void RenderScene( Scene& scene );
 	};
 }

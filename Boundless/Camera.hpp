@@ -43,7 +43,7 @@ namespace Boundless {
 		glm::mat4 m_ViewProjectionMatrix{};
 		glm::mat4 m_InvViewProjectionMatrix{};
 
-		float m_Speed{ 10.f };
+		float m_Speed{ 25.f };
 		float m_Yaw{}, m_Pitch{};
 
 		glm::vec3 m_Front{}, m_Right{}, m_Up{ 0.f, 1.f, 0.f };

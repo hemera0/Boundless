@@ -64,8 +64,10 @@ namespace Boundless {
 					mesh.m_Normals.push_back( glm::vec3( buffer[ 0 ], buffer[ 1 ], buffer[ 2 ] ) );
 				} if ( type == "TEXCOORD_0" ) {
 					mesh.m_Texcoords.push_back( glm::vec2( buffer[ 0 ], buffer[ 1 ] ) );
+				} if ( type == "TANGENT" ) {
+					mesh.m_Tangents.push_back( glm::vec4( buffer[ 0 ], buffer[ 1 ], buffer[ 2 ], buffer[ 3 ] ) );
 				}
-
+			
 				buffer += tinygltf::GetNumComponentsInType(accessor.type);
 			}
 		}
@@ -122,10 +124,10 @@ namespace Boundless {
 			dstMaterial.m_Albedo = glm::vec4( baseColorFactor[ 0 ], baseColorFactor[ 1 ], baseColorFactor[ 2 ], baseColorFactor[ 3 ] );
 			dstMaterial.m_Emissive = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 0.f );
 
-			if ( srcMaterial.extensions.find( "KHR_materials_emissive_strength" ) != srcMaterial.extensions.cend() ) {
-				float emissiveStrength = static_cast<float>(srcMaterial.extensions.at( "KHR_materials_emissive_strength" ).Get( "emissiveStrength" ).GetNumberAsDouble());
-				dstMaterial.m_Emissive *= emissiveStrength;
-			}
+			// if ( srcMaterial.extensions.find( "KHR_materials_emissive_strength" ) != srcMaterial.extensions.cend() ) {
+			// 	float emissiveStrength = static_cast<float>(srcMaterial.extensions.at( "KHR_materials_emissive_strength" ).Get( "emissiveStrength" ).GetNumberAsDouble());
+			// 	dstMaterial.m_Emissive *= emissiveStrength;
+			// }
 
 			dstMaterial.m_MetallicFactor = static_cast< float >( pbrMetallicRoughness.metallicFactor );
 			dstMaterial.m_RoughnessFactor = static_cast< float >( pbrMetallicRoughness.roughnessFactor );

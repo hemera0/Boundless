@@ -9,7 +9,8 @@ namespace Boundless {
 		Camera result = {};
 		result.m_ViewMatrix = glm::lookAt( cameraPos, targetPos, worldUp );
 		result.m_InvViewMatrix = glm::inverse( result.m_ViewMatrix );
-		result.m_ProjectionMatrix = PerspectiveProjection(fov, aspect, nearZ);
+		result.m_ProjectionMatrix = glm::perspectiveRH(glm::radians(fov), aspect, nearZ, 4096.f);
+		// PerspectiveProjection(fov, aspect, nearZ);
 		result.m_ViewProjectionMatrix = result.m_ProjectionMatrix * result.m_ViewMatrix;
 		return result;
 	}
@@ -71,8 +72,8 @@ namespace Boundless {
 		if ( g_Input->GetKeyHeld( KeyCode::LeftControl ) )
 			upMove = -1.f;
 
-		// const auto& mousePos = InputSystem::GetMousePos();
-		// UpdateMouseControls( mousePos.x, mousePos.y );
+		const auto& mousePos = g_Input->GetMousePos();
+		UpdateMouseControls( mousePos.x, mousePos.y );
 		
 		UpdateCameraVectors();
 		UpdateMovementControls( dt, forwardMove, sideMove, upMove );
