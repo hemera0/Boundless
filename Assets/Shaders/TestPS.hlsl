@@ -90,14 +90,14 @@ float4 main(PS_Input input) : SV_Target0 {
 
 	float iblIntensity = 0.75f;
 
-	// radiance += material.CalculateIndirectLight( 
-	// 	TexturePoolSamplers[ diffuseMap ], 
-	// 	TexturePoolSamplers[ brdfLut ], 
-	// 	TexturePoolCube[ diffuseMap ], 
-	// 	TexturePoolCube[ specularMap ], 
-	// 	TexturePool2D[ brdfLut ], 
-	// 	wo
-	// ) * iblIntensity;
+	radiance += material.CalculateIndirectLight( 
+		TexturePoolSamplers[ diffuseMap ], 
+		TexturePoolSamplers[ brdfLut ], 
+		TexturePoolCube[ diffuseMap ], 
+		TexturePoolCube[ specularMap ], 
+		TexturePool2D[ brdfLut ], 
+		wo
+	);
 
 	// normal * 0.5f + 0.5f
     return float4( radiance, 1.f );
