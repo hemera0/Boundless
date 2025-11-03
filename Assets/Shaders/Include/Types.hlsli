@@ -1,6 +1,11 @@
 #include "Bindless.hlsli"
 #include "Material.hlsli"
 
+struct FullScreenPSInput {
+    float4 Position : SV_POSITION;
+    float2 UV : TEXCOORD0;
+};
+
 struct Vertex {
     float3 Position;
     float UVx;
@@ -11,21 +16,38 @@ struct Vertex {
 
 struct SceneData {
     float4x4 CameraViewProjectionMatrix;
+    float4x4 CameraInvViewProjectionMatrix;
     float4 CameraPosition;
     float4 SunDirection;
     float4 SunColor;
     int4 IblTextures;
 };
 
-struct MainPassPushConstants {
+struct GBufferPushConstants {
     vk::BufferPointer<SceneData> Scene;
-    vk::BufferPointer<Material[1]> Materials;
-    vk::BufferPointer<Vertex[1]> Vertices;
-    // uint TLASIndex;
-    // float4x4 ModelMatrix;
-    uint MaterialIndex; 
+	vk::BufferPointer<Material[1]> Materials;
+	vk::BufferPointer<Vertex[1]> Vertices;
+	uint MaterialIndex;
 };
 
-struct CompositePassPushConstants {
-    int FrameBufferTexture;
+struct GBufferDebugPushConstants {
+    int GBufferTexture;
+    int GBufferDepthTexture;
+    int GBufferChannelIndex;
+};
+
+struct LightingPushConstants {
+    vk::BufferPointer<SceneData> Scene;
+    int GBufferTexture;
+    int GBufferDepthTexture;
+};
+
+struct CompositePushConstants {
+    int Texture;
+    int ApplyGammaCurve;
+    int ApplyTonemapping;
+};
+
+struct BlitPushConstants {
+    int Texture;
 };

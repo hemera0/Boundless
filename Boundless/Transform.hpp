@@ -11,13 +11,12 @@ namespace Boundless {
 		
 		// TODO: finish...
 
+		glm::mat4 m_LocalTransform{};
 		glm::mat4 m_WorldTransform{};
 	private:
 		glm::vec3 m_Translation{}, m_Scale{};
 		glm::quat m_Rotation{};
 
 		Transform* m_Parent{};
-
-		glm::mat4 m_LocalTransform{};
 	};
 }

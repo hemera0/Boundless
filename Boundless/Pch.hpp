@@ -3,9 +3,12 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <memory>
+#include <ranges>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <windows.h>

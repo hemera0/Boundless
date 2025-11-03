@@ -4,39 +4,31 @@
 #include "Engine.hpp"
 
 namespace Boundless {
-	// TODO: Interactive camera.
 	Camera Camera::StationaryLookAtCamera( const glm::vec3& cameraPos, const glm::vec3& targetPos, const glm::vec3& worldUp, const float fov, const float aspect, const float nearZ ) {
 		Camera result = {};
 		result.m_ViewMatrix = glm::lookAt( cameraPos, targetPos, worldUp );
 		result.m_InvViewMatrix = glm::inverse( result.m_ViewMatrix );
 		result.m_ProjectionMatrix = glm::perspectiveRH(glm::radians(fov), aspect, nearZ, 4096.f);
-		// PerspectiveProjection(fov, aspect, nearZ);
 		result.m_ViewProjectionMatrix = result.m_ProjectionMatrix * result.m_ViewMatrix;
 		return result;
 	}
+
 	void Camera::UpdateMouseControls( float xpos, float ypos ) { 
-		float x = static_cast< float >( xpos );
-		float y = static_cast< float >( ypos );
+		static float oldX = xpos;
+		static float oldY = ypos;
 
-		static float oldX = x;
-		static float oldY = y;
+		float dx = xpos - oldX;
+		float dy = oldY - ypos;
 
-		float dx = oldX - x;
-		float dy = oldY - y;
+		const float Sensitivity = 0.01f;
+		m_Yaw += dx * Sensitivity;
+		m_Pitch += dy * Sensitivity;
+		m_Pitch = glm::clamp( m_Pitch, -89.9f, 89.9f );
 
-		{
-			const float Sensitivity = 0.01f;
+		UpdateCameraVectors();
 
-			m_Yaw += dx * Sensitivity;
-			m_Pitch += dy * Sensitivity;
-
-			m_Pitch = glm::clamp( m_Pitch, glm::radians( -89.9f ), glm::radians( 89.9f ) );
-
-			UpdateCameraVectors();
-
-			oldX = x;
-			oldY = y;
-		}
+		oldX = xpos;
+		oldY = ypos;
 	}
 	
 	void Camera::UpdateCameraVectors() { 

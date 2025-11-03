@@ -1,6 +1,7 @@
 #include "Pch.hpp"
 #include "Device.hpp"
 
+// TODO: Swap for differnet format possibly.
 #include <ktxvulkan.h>
 #pragma comment(lib, "ktx.lib")
 
@@ -25,8 +26,8 @@ namespace Boundless {
 		volkLoadInstanceOnly( m_Instance );
 
 		m_PhysicalDevice = VkUtil::GetPhysicalDevice( m_Instance, extensions );
-		m_Surface = VkUtil::CreateSurfaceForWindow( m_Instance, windowHandle );
-		m_Device = VkUtil::CreateLogicalDevice( m_Instance, m_PhysicalDevice, m_Surface, extensions );
+		m_Surface	     = VkUtil::CreateSurfaceForWindow( m_Instance, windowHandle );
+		m_Device		 = VkUtil::CreateLogicalDevice( m_Instance, m_PhysicalDevice, m_Surface, extensions );
 
 		volkLoadDevice( m_Device );
 
@@ -55,13 +56,13 @@ namespace Boundless {
 		m_CommandPool = VkUtil::CreateCommandPool( m_Device, poolCreateInfo );
 
 		CreateGlobalDescriptors();
+		CreateSamplers();
 	}
 
 	Device::~Device() { 
 		vkDeviceWaitIdle(m_Device);
 
-		ReleaseAllBuffers();
-		ReleaseAllImages();
+		ReleaseResources();
 
 		vkDestroyDescriptorSetLayout( m_Device, m_TexturePoolLayout, nullptr );
 		vkDestroyDescriptorPool( m_Device, m_DescriptorPool, nullptr );
@@ -74,12 +75,66 @@ namespace Boundless {
 		vkDestroyInstance( m_Instance, nullptr );
 	}
 
-	void Device::CreateGlobalDescriptors() {
-		VkDescriptorSetLayoutBinding texturesDescriptorSetLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024u, VK_SHADER_STAGE_ALL };
-		VkDescriptorSetLayoutBinding acceleratingStructureDescriptorSetLayoutBinding = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1024u, VK_SHADER_STAGE_ALL };
+	void Device::UploadImageToGPU( VkImageView imageView, uint32_t slotId ) { 
+		VkDescriptorImageInfo imageInfo = { nullptr, imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
-		std::array<VkDescriptorBindingFlags, 2> descriptorBindingFlags = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT };
-		std::array< VkDescriptorSetLayoutBinding, 2> bindings = { texturesDescriptorSetLayoutBinding, acceleratingStructureDescriptorSetLayoutBinding };
+		VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		write.dstBinding = 0;
+		write.dstSet = m_TexturePool;
+		write.descriptorCount = 1;
+		write.dstArrayElement = slotId;
+		write.pImageInfo = &imageInfo;
+		vkUpdateDescriptorSets( m_Device, 1, &write, 0, nullptr );
+	}
+
+	void Device::CreateSamplers() {
+		m_Samplers[ LINEAR_CLAMP ] = CreateSampler( SamplerDesc{
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_Anisotropic = false
+			} );
+
+		m_Samplers[ ANISO_WRAP ] = CreateSampler( SamplerDesc {
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+				.m_Anisotropic = true
+			} );
+		
+		m_Samplers[ ANISO_CLAMP ] = CreateSampler( SamplerDesc {
+				.m_MinFilter = VK_FILTER_LINEAR,
+				.m_MagFilter = VK_FILTER_LINEAR,
+				.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				.m_Anisotropic = true
+			} );
+
+		std::array<VkDescriptorImageInfo, SAMPLER_TYPE_MAX> samplerInfos = {};
+		for ( uint32_t i = 0; i < SAMPLER_TYPE_MAX; i++ ) {
+			samplerInfos[ i ].sampler = m_Samplers[ i ];
+		}
+
+		VkWriteDescriptorSet samplerWrite = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		samplerWrite.dstSet = m_TexturePool;
+		samplerWrite.dstBinding = 2;
+		samplerWrite.descriptorCount = SAMPLER_TYPE_MAX;
+		samplerWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+		samplerWrite.pImageInfo = samplerInfos.data();
+
+		vkUpdateDescriptorSets( m_Device, 1, &samplerWrite, 0, nullptr );
+	}
+
+	void Device::CreateGlobalDescriptors() {
+		VkDescriptorSetLayoutBinding texturesDescriptorSetLayoutBinding = { 0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024u, VK_SHADER_STAGE_ALL };
+		VkDescriptorSetLayoutBinding accelerationStructureDescriptorSetLayoutBinding = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1024u, VK_SHADER_STAGE_ALL };
+		VkDescriptorSetLayoutBinding samplersDescriptorSetLayoutBinding = { 2, VK_DESCRIPTOR_TYPE_SAMPLER, SAMPLER_TYPE_MAX, VK_SHADER_STAGE_ALL };
+
+		std::array<VkDescriptorBindingFlags, 3> descriptorBindingFlags = { VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT };
+		std::array< VkDescriptorSetLayoutBinding, 3> bindings = { texturesDescriptorSetLayoutBinding, accelerationStructureDescriptorSetLayoutBinding, samplersDescriptorSetLayoutBinding };
 
 		VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetLayoutBindingFlags = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO };
 		descriptorSetLayoutBindingFlags.pBindingFlags = descriptorBindingFlags.data();
@@ -93,17 +148,18 @@ namespace Boundless {
 		vkCreateDescriptorSetLayout( m_Device, &descriptorSetLayoutCreateInfo, nullptr, &m_TexturePoolLayout );
 
 		VkDescriptorPoolSize descriptorPoolSizes[ ] = {
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024 },
 			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1024 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, SAMPLER_TYPE_MAX }
 		};
 
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
-		descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		descriptorPoolCreateInfo.pNext = NULL;
-		descriptorPoolCreateInfo.flags = 0;
-		descriptorPoolCreateInfo.maxSets = 1;
+		descriptorPoolCreateInfo.sType		   = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descriptorPoolCreateInfo.pNext		   = NULL;
+		descriptorPoolCreateInfo.flags		   = 0;
+		descriptorPoolCreateInfo.maxSets	   = 1;
 		descriptorPoolCreateInfo.poolSizeCount = _countof( descriptorPoolSizes );
-		descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
+		descriptorPoolCreateInfo.pPoolSizes	   = descriptorPoolSizes;
 
 		vkCreateDescriptorPool( m_Device, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool );
 
@@ -114,94 +170,98 @@ namespace Boundless {
 		vkAllocateDescriptorSets( m_Device, &setAllocateInfo, &m_TexturePool );
 	}
 
-	Image Device::CreateImage( const Image::Desc& imageDesc ) {
-		Image res = {};
+	ImageHandle Device::CreateImage( const Image::Desc& imageDesc ) {
+		Image res{};
 
 		VkImageCreateInfo createInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-		createInfo.imageType = imageDesc.m_Type;
-		createInfo.extent.width = imageDesc.m_Width;
+		createInfo.imageType     = imageDesc.m_Type;
+		createInfo.extent.width  = imageDesc.m_Width;
 		createInfo.extent.height = imageDesc.m_Height;
-		createInfo.extent.depth = 1;
-		createInfo.mipLevels = imageDesc.m_Levels;
-		createInfo.arrayLayers = 1;
-		createInfo.format = imageDesc.m_Format;
-		createInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // I have never not used optimal...
+		createInfo.extent.depth  = 1;
+		createInfo.mipLevels     = imageDesc.m_Levels;
+		createInfo.arrayLayers   = imageDesc.m_Layers;
+		createInfo.format		 = imageDesc.m_Format;
+		createInfo.tiling		 = imageDesc.m_Tiling; // I have never not used optimal...
 		createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		createInfo.usage = imageDesc.m_Usage;
-		createInfo.samples = imageDesc.m_Samples;
-		createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		createInfo.usage		 = imageDesc.m_Usage;
+		createInfo.samples		 = imageDesc.m_Samples;
+		createInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
 
 		VmaAllocationCreateInfo allocInfo = {};
-		allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+		allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
 		vmaCreateImage( m_Allocator, &createInfo, &allocInfo, &res.m_Image, &res.m_Allocation, nullptr );
 
-		res.m_Format = imageDesc.m_Format;
-		res.m_Levels = imageDesc.m_Levels;
-		// res.m_Layers = imageDesc.m_Layers;
-		res.m_Width = imageDesc.m_Width;
-		res.m_Height = imageDesc.m_Height;
-
+		size_t newId = m_AllImages.size();
+		res.m_Resource = ImageHandle(newId);
+		res.m_Desc	   = imageDesc;
+		
 		m_AllImages.push_back(res);
-
-		return res;
+		
+		return ImageHandle( newId );
 	}
 
-	ImageHandle Device::CreateTexture( const VkImageView& texture, const VkSampler& sampler ) {
-		size_t newId = m_AllTextures.size();
+	ImageHandle Device::CreateImageView( ImageHandle resource, const Image::Desc& imageDesc ) {
+		Image res = {};
 
-		m_AllTextures.push_back( texture );
+		VkImageViewCreateInfo createInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 
-		VkDescriptorImageInfo imageInfo = { sampler, texture,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+		switch(imageDesc.m_Type) {
+		case VK_IMAGE_TYPE_1D:
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_1D;
+			break;
+		case VK_IMAGE_TYPE_2D: 
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			break;
+		case VK_IMAGE_TYPE_3D:
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+			break;
+		}
 
-		VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-		write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		write.dstBinding = 0;
-		write.dstSet = m_TexturePool;
-		write.descriptorCount = 1;
-		write.dstArrayElement = uint32_t( newId );
-		write.pImageInfo = &imageInfo;
+		createInfo.format = imageDesc.m_Format;
 
-		vkUpdateDescriptorSets( m_Device, 1, &write, 0, nullptr );
+		bool isDepthImage = ( imageDesc.m_Usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT ) || ( imageDesc.m_Format == VK_FORMAT_D32_SFLOAT );
 
-		return static_cast< ImageHandle >( newId );
+		VkImageAspectFlags subresourceFlags = 
+			isDepthImage ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+
+		// TODO: Fixme.
+		createInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY,  VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		createInfo.subresourceRange = { subresourceFlags, 0, imageDesc.m_Levels, 0, imageDesc.m_Layers };
+
+		res.m_ImageView = VkUtil::CreateImageView( m_Device, m_AllImages[size_t(resource)], &createInfo );
+
+		size_t newId = m_AllImages.size();
+
+		if( imageDesc.m_Usage & VK_IMAGE_USAGE_SAMPLED_BIT ) {
+			UploadImageToGPU( res.m_ImageView, uint32_t( newId ) );
+		}
+
+		m_AllImages.push_back( res );
+
+		return ImageHandle(newId);
+	}
+
+	ImageHandle Device::CreateImageView( ImageHandle resource ) {
+		return CreateImageView( resource, m_AllImages[ size_t( resource ) ].m_Desc );
 	}
 
 	BufferHandle Device::CreateBuffer( const Buffer::Desc& bufferDesc ) {
 		size_t newId = m_AllBuffers.size();
 
-		m_AllBuffers.push_back( new Buffer( m_Device, m_Allocator, bufferDesc ) );
+		m_AllBuffers.emplace_back( m_Device, m_Allocator, bufferDesc );
 
 		return static_cast< BufferHandle >( newId );
 	}
 
-	Buffer* Device::GetBuffer( BufferHandle handle ) {
-		return m_AllBuffers[ static_cast< size_t >( handle ) ];
-	}
-
-	void Device::ReleaseAllBuffers() { 
-		for( Buffer* buffer : m_AllBuffers)
-			delete buffer;
-
-		m_AllBuffers.clear();
-	}
-
-	void Device::ReleaseAllImages() { 
-		for(Image& image : m_AllImages) {
-			vmaDestroyImage(m_Allocator, image.m_Image, image.m_Allocation);
+	void Device::ReleaseResources() { 
+		// Bugged.
+		for ( Image& image : m_AllImages ) {
+			vmaDestroyImage( m_Allocator, image.m_Image, image.m_Allocation );
 		}
 
-		for(VkImageView imageView : m_AllTextures ) {
-			vkDestroyImageView(m_Device, imageView, nullptr);
-		}
-
-		for(auto& [sampler, desc] : m_AllSamplers ) {
-			vkDestroySampler(m_Device, sampler, nullptr);
-		}
-
-		m_AllSamplers.clear();
-		m_AllTextures.clear();
 		m_AllImages.clear();
+		m_AllBuffers.clear();
 	}
 
 	std::unique_ptr<StagingBuffer> Device::CreateStagingBuffer( const VkDeviceSize size ) {
@@ -295,21 +355,17 @@ namespace Boundless {
 			imageBlit.dstOffsets[ 0 ] = imageBlit.srcOffsets[ 0 ];
 			imageBlit.dstOffsets[ 1 ] = { mipWidth > 1 ? ( mipWidth >> 1 ) : 1 , mipHeight > 1 ? ( mipHeight >> 1 ) : 1, 1 };
 
-			//Blit the texture
 			vkCmdBlitImage( commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				1, &imageBlit, VK_FILTER_LINEAR );
 
-			//Set the layout and Access Mask (again) for the shader to read
 			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 			imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 			imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-			//Transfer the layout and Access Mask Information (Again, based on above values)
 			vkCmdPipelineBarrier( commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				0, 0, nullptr, 0, nullptr, 1, &imageBarrier );
 
-			//Reduce the Mip level down by 1 level [By cutting width and height in half]
 			if ( mipWidth > 1 ) { mipWidth >>= 1; }
 			if ( mipHeight > 1 ) { mipHeight >>= 1; }
 		}
@@ -329,7 +385,7 @@ namespace Boundless {
 		vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &commandBuffer );
 	}
 
-	Image Device::LoadImageFromFile( const std::string& path, bool isSRGB ) {
+	std::pair<ImageHandle, ImageHandle> Device::LoadImageFromFile( const std::string& path, bool isSRGB ) {
 		int width{}, height{}, texChannels;
 		stbi_uc* pixels = stbi_load( path.c_str(), &width, &height, &texChannels, STBI_rgb_alpha );
 		if ( !pixels ) {
@@ -349,7 +405,7 @@ namespace Boundless {
 
 		VkFormat format = isSRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
 
-		Image image = CreateImage(
+		ImageHandle handle = CreateImage(
 			Image::Desc {
 				.m_Type = VK_IMAGE_TYPE_2D,
 				.m_Width = uint32_t(width),
@@ -362,11 +418,10 @@ namespace Boundless {
 			}
 		);
 
-		// Vulkan tutorial talks about using transition layout to go to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
-		// But we can just set this for the VkImageView in the Descriptor.
+		Image& image = GetImage(handle);
+
 		TransitionImageLayout( image.m_Image, mipLevels, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 
-		// Copy image data from staging buffer to the VkImage.
 		{
 			VkCommandBuffer commandBuffer = CreateCommandBuffer( );
 
@@ -379,65 +434,57 @@ namespace Boundless {
 		}
 
 		GenerateMipmaps( image.m_Image, width, height, mipLevels );
+		CreateImageView(handle);
 
-		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-		textureView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		textureView.format = image.GetFormat();
-		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
-		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1 };
-
-		image.m_ImageView = VkUtil::CreateImageView( m_Device, image, &textureView );
-
-		return image;
+		return { ImageHandle( m_AllImages.size() - 1 ), ImageHandle( m_AllImages.size() - 2) };
 	}
 
-	Image Device::LoadKTXImageFromFile( const std::string& path ) {
+	std::pair<ImageHandle, ImageHandle> Device::LoadKTXImageFromFile( const std::string& path ) {
+		// This whole function should be redone.
 		ktxVulkanDeviceInfo deviceInfo = {};
 
 		ktx_error_code_e result = ktxVulkanDeviceInfo_Construct( &deviceInfo, m_PhysicalDevice, m_Device, m_GraphicsQueue, m_CommandPool, nullptr );
-		if ( result != ktx_error_code_e::KTX_SUCCESS )
+		if ( result != KTX_SUCCESS )
 			return {};
 
 		ktxTexture* kTexture = nullptr;
 		result = ktxTexture_CreateFromNamedFile( path.c_str(), KTX_TEXTURE_CREATE_NO_FLAGS, &kTexture );
-		if ( result != ktx_error_code_e::KTX_SUCCESS )
+		if ( result != KTX_SUCCESS )
 			return {};
 
-		// This gets mad if you don't encode/save the .ktx file in a format Vulkan likes
 		ktxVulkanTexture texture = {};
-		result = ktxTexture_VkUploadEx(
-			kTexture,
-			&deviceInfo,
-			&texture,
-			VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_SAMPLED_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-
-		if ( result != ktx_error_code_e::KTX_SUCCESS )
+		result = ktxTexture_VkUploadEx( kTexture, &deviceInfo, &texture, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		if ( result != KTX_SUCCESS )
 			return {};
 
-		// After loading all textures you don't need these anymore
 		ktxTexture_Destroy( kTexture );
 		ktxVulkanDeviceInfo_Destruct( &deviceInfo );
 
 		Image res = {};
-		res.m_Format = texture.imageFormat;
-		res.m_Levels = texture.levelCount;
-		res.m_Layers = texture.layerCount;
-		res.m_Width = texture.width;
-		res.m_Height = texture.height;
+		res.m_Desc.m_Format = texture.imageFormat;
+		res.m_Desc.m_Levels = texture.levelCount;
+		res.m_Desc.m_Layers = texture.layerCount;
+		res.m_Desc.m_Width = texture.width;
+		res.m_Desc.m_Height = texture.height;
 		res.m_Image = texture.image;
+		
+		m_AllImages.push_back( res );
 
 		VkImageViewCreateInfo textureView = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
 		textureView.viewType = texture.viewType;
 		textureView.format = texture.imageFormat;
 		textureView.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
 		textureView.subresourceRange = VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, texture.levelCount, 0, texture.layerCount };
-
+		
 		res.m_ImageView = VkUtil::CreateImageView( m_Device, res.m_Image, &textureView );
+		m_AllImages.push_back( res );
 
-		return res;
+		ImageHandle viewHandle = ImageHandle( m_AllImages.size() - 1 );
+		ImageHandle imageHandle = ImageHandle( m_AllImages.size() - 2 );
+
+		UploadImageToGPU( res.m_ImageView, uint32_t(viewHandle) );
+		
+		return { viewHandle, imageHandle };
 	}
 
 	VkCommandBuffer Device::CreateCommandBuffer() {
@@ -445,12 +492,6 @@ namespace Boundless {
 	}
 
 	VkSampler Device::CreateSampler( const SamplerDesc& samplerDesc ) {
-		for ( const auto& [sampler, desc] : m_AllSamplers ) {
-			if ( desc.m_MagFilter == samplerDesc.m_MagFilter && desc.m_MinFilter == samplerDesc.m_MinFilter &&
-				 desc.m_WrapT == samplerDesc.m_WrapT && desc.m_WrapS == samplerDesc.m_WrapS )
-				return sampler;
-		}
-
 		VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 		samplerInfo.flags = 0;
 		samplerInfo.addressModeU = samplerDesc.m_WrapS;
@@ -470,8 +511,6 @@ namespace Boundless {
 
 		VkSampler sampler = VK_NULL_HANDLE;
 		vkCreateSampler( m_Device, &samplerInfo, nullptr, &sampler );
-
-		m_AllSamplers.push_back( { sampler, samplerDesc } );
 
 		return sampler;
 	}

@@ -1,8 +1,15 @@
 #include "Pch.hpp"
 #include "Scene.hpp"
 #include "Engine.hpp"
+#include "Transform.hpp"
 
 namespace Boundless {
+	Scene::Scene() { 
+		m_RootEntity = m_Registry.create();
+		m_Registry.emplace<Transform>(m_RootEntity);
+		m_Registry.emplace<EntityRelation>(m_RootEntity);
+	}
+
 	void Scene::OnDeviceStart( const std::unique_ptr<Device>& device ) { 
 		m_UniformBuffer = device->CreateBuffer(
 			Buffer::Desc{
@@ -13,7 +20,7 @@ namespace Boundless {
 			}
 		);
 
-		UploadMeshes( device );
+		UploadMeshes(device);
 		UploadTLAS(device);
 
 		UploadTextures( device );
@@ -45,7 +52,7 @@ namespace Boundless {
 			}
 
 			if ( !mesh.m_Indices.empty() ) {
-				Buffer* indexBuffer = device->GetBuffer( mesh.m_IndexBuffer );
+				Buffer& indexBuffer = device->GetBuffer( mesh.m_IndexBuffer );
 
 				size_t bufferSize = mesh.m_Indices.size() * sizeof( uint32_t );
 				std::unique_ptr<StagingBuffer> stagingBuffer = device->CreateStagingBuffer( bufferSize );
@@ -54,7 +61,7 @@ namespace Boundless {
 				VkCommandBuffer commandBuffer = device->CreateCommandBuffer();
 
 				VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-				VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, *indexBuffer, bufferSize );
+				VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, indexBuffer, bufferSize );
 				VkUtil::CommandBufferEnd( commandBuffer );
 				VkUtil::CommandBufferSubmit( commandBuffer, device->GetGraphicsQueue() );
 
@@ -62,7 +69,7 @@ namespace Boundless {
 			}
 
 			{
-				Buffer* vertexBuffer = device->GetBuffer( mesh.m_VertexBuffer );
+				Buffer& vertexBuffer = device->GetBuffer( mesh.m_VertexBuffer );
 
 				size_t bufferSize = mesh.m_Vertices.size() * sizeof( MeshVertexData );
 				std::unique_ptr<StagingBuffer> stagingBuffer = device->CreateStagingBuffer( bufferSize );
@@ -71,7 +78,7 @@ namespace Boundless {
 				VkCommandBuffer commandBuffer = device->CreateCommandBuffer();
 
 				VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-				VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, *vertexBuffer, bufferSize );
+				VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, vertexBuffer, bufferSize );
 				VkUtil::CommandBufferEnd( commandBuffer );
 				VkUtil::CommandBufferSubmit( commandBuffer, device->GetGraphicsQueue() );
 
@@ -85,11 +92,11 @@ namespace Boundless {
 				accelerationStructureGeo.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 				accelerationStructureGeo.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
 				accelerationStructureGeo.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-				accelerationStructureGeo.geometry.triangles.vertexData.deviceAddress = device->GetBuffer(mesh.m_VertexBuffer)->GetDeviceAddress();
+				accelerationStructureGeo.geometry.triangles.vertexData.deviceAddress = device->GetBuffer(mesh.m_VertexBuffer).GetDeviceAddress();
 				accelerationStructureGeo.geometry.triangles.vertexStride = sizeof( MeshVertexData );
 				accelerationStructureGeo.geometry.triangles.maxVertex = uint32_t(mesh.m_Positions.size() - 1);
 				accelerationStructureGeo.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-				accelerationStructureGeo.geometry.triangles.indexData.deviceAddress = device->GetBuffer(mesh.m_IndexBuffer)->GetDeviceAddress();
+				accelerationStructureGeo.geometry.triangles.indexData.deviceAddress = device->GetBuffer(mesh.m_IndexBuffer).GetDeviceAddress();
 
 				VkAccelerationStructureBuildGeometryInfoKHR buildInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 				buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -119,12 +126,13 @@ namespace Boundless {
 				);
 
 				VkAccelerationStructureCreateInfoKHR accelerationInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
-				accelerationInfo.buffer = device->GetBuffer( mesh.m_BlasBuffer )->GetHandle();
+				accelerationInfo.buffer = device->GetBuffer( mesh.m_BlasBuffer ).GetHandle();
 				accelerationInfo.offset = 0;
 				accelerationInfo.size = sizeInfo.accelerationStructureSize;
 				accelerationInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 
-				vkCreateAccelerationStructureKHR( device->GetDevice(), &accelerationInfo, nullptr, &mesh.m_Blas );
+				VkResult result = vkCreateAccelerationStructureKHR( device->GetDevice(), &accelerationInfo, nullptr, &mesh.m_Blas );
+				assert(result == VK_SUCCESS);
 
 				VkCommandBuffer commandBuffer = device->CreateCommandBuffer();
 				VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
@@ -133,12 +141,12 @@ namespace Boundless {
 					VkAccelerationStructureBuildRangeInfoKHR buildRange = {};
 					VkAccelerationStructureBuildRangeInfoKHR* buildRangePtrs[ 1 ] = { &buildRange };
 
-					buildInfo.scratchData.deviceAddress = device->GetBuffer( scratchBuffer )->GetDeviceAddress();
+					buildInfo.scratchData.deviceAddress = device->GetBuffer( scratchBuffer ).GetDeviceAddress();
 					buildInfo.dstAccelerationStructure = mesh.m_Blas;
 					buildRange.primitiveCount = maxPrimitiveCounts;
 
 					vkCmdBuildAccelerationStructuresKHR( commandBuffer, 1, &buildInfo, buildRangePtrs );
-	
+
 					VkAccessFlags accessFlags = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
 					VkUtil::CommandBufferStageBarrier( commandBuffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, accessFlags, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, accessFlags );
 				}
@@ -149,7 +157,7 @@ namespace Boundless {
 
 				// TODO: fixme (device->ReleaseBuffer or something)
 				// Wow this looks ghetto (Technically this is because it wastes a slot in the vector now with garbage data...
-				delete device->GetBuffer(scratchBuffer);
+				// delete device->GetBuffer(scratchBuffer);
 			}
 		}
 	}
@@ -202,13 +210,13 @@ namespace Boundless {
 			}
 		);
 
-		device->GetBuffer( m_TLASInstances )->Patch( RTinstances.data(), sizeof( VkAccelerationStructureInstanceKHR ) * RTinstances.size() );
+		device->GetBuffer( m_TLASInstances ).Patch( RTinstances.data(), sizeof( VkAccelerationStructureInstanceKHR ) * RTinstances.size() );
 		
-		if( m_TLAS == VK_NULL_HANDLE) {
+		if(m_TLAS == VK_NULL_HANDLE) {
 			VkAccelerationStructureGeometryKHR geometry = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
 			geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
 			geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-			geometry.geometry.instances.data.deviceAddress = device->GetBuffer( m_TLASInstances )->GetDeviceAddress();
+			geometry.geometry.instances.data.deviceAddress = device->GetBuffer( m_TLASInstances ).GetDeviceAddress();
 
 			VkAccelerationStructureBuildGeometryInfoKHR buildInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 			buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
@@ -219,10 +227,6 @@ namespace Boundless {
 
 			VkAccelerationStructureBuildSizesInfoKHR sizeInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
 			vkGetAccelerationStructureBuildSizesKHR( device->GetDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo, &m_TotalPrimitiveCount, &sizeInfo );
-
-			printf( "TLAS accelerationStructureSize: %.2f MB, scratchSize: %.2f MB, updateScratch: %.2f MB\n", double( sizeInfo.accelerationStructureSize ) / 1e6, double( sizeInfo.buildScratchSize ) / 1e6, double( sizeInfo.updateScratchSize ) / 1e6 );
-
-			BufferHandle {};
 
 			m_TLASBuffer = device->CreateBuffer(
 				Buffer::Desc{
@@ -239,11 +243,12 @@ namespace Boundless {
 				});
 
 			VkAccelerationStructureCreateInfoKHR accelerationInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
-			accelerationInfo.buffer = device->GetBuffer(m_TLASBuffer)->GetHandle();
+			accelerationInfo.buffer = device->GetBuffer(m_TLASBuffer);
 			accelerationInfo.size = sizeInfo.accelerationStructureSize;
 			accelerationInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
-			vkCreateAccelerationStructureKHR( device->GetDevice(), &accelerationInfo, nullptr, &m_TLAS );
+			VkResult result = vkCreateAccelerationStructureKHR( device->GetDevice(), &accelerationInfo, nullptr, &m_TLAS );
+			assert(result == VK_SUCCESS);
 		}
 	}
 
@@ -251,7 +256,7 @@ namespace Boundless {
 		VkAccelerationStructureGeometryKHR geometry = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
 		geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
 		geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-		geometry.geometry.instances.data.deviceAddress = device->GetBuffer( m_TLASInstances )->GetDeviceAddress();
+		geometry.geometry.instances.data.deviceAddress = device->GetBuffer( m_TLASInstances ).GetDeviceAddress();
 
 		VkAccelerationStructureBuildGeometryInfoKHR buildInfo = { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 		buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
@@ -262,7 +267,7 @@ namespace Boundless {
 
 		buildInfo.srcAccelerationStructure = m_TLAS;
 		buildInfo.dstAccelerationStructure = m_TLAS;
-		buildInfo.scratchData.deviceAddress = device->GetBuffer( m_TLASScratchBuffer )->GetDeviceAddress();
+		buildInfo.scratchData.deviceAddress = device->GetBuffer( m_TLASScratchBuffer ).GetDeviceAddress();
 
 		VkAccelerationStructureBuildRangeInfoKHR buildRange = {};
 		buildRange.primitiveCount = m_TotalPrimitiveCount;
@@ -294,23 +299,23 @@ namespace Boundless {
 			Material& mat = m_Registry.get<Material>( ent );
 
 			if ( !mat.m_AlbedoTexturePath.empty() ) {
-				Image image = device->LoadImageFromFile( mat.m_AlbedoTexturePath, true );
-				mat.m_AlbedoTexture = device->CreateTexture( image.GetView(), device->CreateSampler( mat.m_AlbedoSampler ) );
+				const auto [view, image] = device->LoadImageFromFile( mat.m_AlbedoTexturePath, true );
+				mat.m_AlbedoTexture = view; // ), device->GetSampler( ANISO_WRAP ) );
 			}
 
 			if ( !mat.m_NormalsTexturePath.empty() ) {
-				Image image = device->LoadImageFromFile( mat.m_NormalsTexturePath, false );
-				mat.m_NormalsTexture = device->CreateTexture( image.GetView(), device->CreateSampler( mat.m_AlbedoSampler ) );
+				const auto [view, image] = device->LoadImageFromFile( mat.m_NormalsTexturePath, false );
+				mat.m_NormalsTexture = view; // ), device->GetSampler( ANISO_WRAP ) );
 			}
 
 			if ( !mat.m_MetalRoughnessTexturePath.empty() ) {
-				Image image = device->LoadImageFromFile( mat.m_MetalRoughnessTexturePath, false );
-				mat.m_MetalRoughnessTexture = device->CreateTexture( image.GetView(), device->CreateSampler( mat.m_AlbedoSampler ) );
+				const auto [view, image] = device->LoadImageFromFile( mat.m_MetalRoughnessTexturePath, false );
+				mat.m_MetalRoughnessTexture = view; // ), device->GetSampler( ANISO_WRAP ) );
 			}
 
 			if ( !mat.m_EmissiveTexturePath.empty() ) {
-				Image image = device->LoadImageFromFile( mat.m_EmissiveTexturePath, false );
-				mat.m_EmissiveTexture = device->CreateTexture( image.GetView(), device->CreateSampler( mat.m_AlbedoSampler ) );
+				const auto [view, image] = device->LoadImageFromFile( mat.m_EmissiveTexturePath, false );
+				mat.m_EmissiveTexture = view; // ), device->GetSampler( ANISO_WRAP ) );
 			}
 		}
 	}
@@ -337,6 +342,7 @@ namespace Boundless {
 			materials.push_back( gpuMat );
 		}
 
+		// TODO: Fix ghettoness of this (It's not terrible since it will only happen on scene load basically but.
 		std::sort( materials.begin(), materials.end(), [ & ]( const auto& a, const auto& b ) -> bool
 		{
 			return a.m_Index < b.m_Index;
@@ -356,13 +362,58 @@ namespace Boundless {
 
 		stagingBuffer->Patch( materials.data(), materials.size() * sizeof( GPUMaterial ) );
 
-		VkCommandBuffer commandBuffer = device->CreateCommandBuffer();
+		{
+			VkCommandBuffer commandBuffer = device->CreateCommandBuffer();
+			VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+			VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, device->GetBuffer( m_MaterialBuffer ), bufferSize );
+			VkUtil::CommandBufferEnd( commandBuffer );
+			VkUtil::CommandBufferSubmit( commandBuffer, device->GetGraphicsQueue() );
+			vkFreeCommandBuffers( device->GetDevice(), device->GetCommandPool(), 1, &commandBuffer );
+		}
+	}
 
-		VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-		VkUtil::CommandBufferCopyBuffer( commandBuffer, *stagingBuffer, *device->GetBuffer( m_MaterialBuffer ), bufferSize );
-		VkUtil::CommandBufferEnd( commandBuffer );
-		VkUtil::CommandBufferSubmit( commandBuffer, device->GetGraphicsQueue() );
+	void Scene::UpdateTransformsRecursive( entt::entity entity ) {
+		const auto& relation = m_Registry.get<EntityRelation>( entity );
+		const auto  parent = GetParent( entity );
 
-		vkFreeCommandBuffers( device->GetDevice(), device->GetCommandPool(), 1, &commandBuffer );
+		auto& transform = m_Registry.get<Transform>( entity );
+		if ( parent == entt::null || parent == m_RootEntity ) {
+			transform.m_WorldTransform = transform.m_LocalTransform;
+		} else {
+			const Transform& parentTransform = m_Registry.get<Transform>( parent );
+			transform.m_WorldTransform = parentTransform.m_WorldTransform * transform.m_LocalTransform;
+		}
+
+		for ( entt::entity child : relation.m_Children )
+			UpdateTransformsRecursive( child );
+	}
+
+	void Scene::UpdateTransforms() { 
+		UpdateTransformsRecursive(m_RootEntity);
+	}
+
+	entt::entity Scene::GetParent( entt::entity entity ) {
+		return m_Registry.get<EntityRelation>( entity ).m_Parent;
+	}
+
+	void Scene::ParentTo( entt::entity entity, entt::entity parent ) { 
+		EntityRelation& rel = m_Registry.get<EntityRelation>(entity);
+		if(rel.m_Parent == parent)
+			return;
+
+		rel.m_Parent = parent;
+
+		EntityRelation& parentRel = m_Registry.get<EntityRelation>(parent);
+		parentRel.m_Children.push_back(entity);
+	}
+
+	entt::entity Scene::CreateGameObject() {
+		entt::entity ent = m_Registry.create();
+
+		m_Registry.emplace<Transform>(ent);
+		m_Registry.emplace<EntityRelation>(ent);
+
+		ParentTo( ent, m_RootEntity );
+		return ent;
 	}
 }

@@ -769,7 +769,7 @@ namespace VkUtil {
 	VkPipelineColorBlendAttachmentState PipelineDefaultColorBlendAttachmentState() {
 		VkPipelineColorBlendAttachmentState out = { };
 		out.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		out.blendEnable = VK_TRUE;
+		out.blendEnable = VK_FALSE;
 		out.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 		out.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 		out.colorBlendOp = VK_BLEND_OP_ADD;
@@ -777,31 +777,5 @@ namespace VkUtil {
 		out.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 		out.alphaBlendOp = VK_BLEND_OP_ADD;
 		return out;
-	}
-
-	VkSampler CreateSampler( const VkDevice& device, VkSamplerAddressMode addressMode, VkFilter filter, float anisotropy, float minLod, float maxLod ) {
-		VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-		samplerInfo.flags = 0;
-		samplerInfo.addressModeU = addressMode;
-		samplerInfo.addressModeV = addressMode;
-		samplerInfo.addressModeW = addressMode;
-		samplerInfo.minFilter = filter;
-		samplerInfo.magFilter = filter;
-		samplerInfo.mipmapMode = ( filter == VK_FILTER_NEAREST ) ? VK_SAMPLER_MIPMAP_MODE_NEAREST : VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		samplerInfo.mipLodBias = 0;
-		samplerInfo.minLod = minLod;
-		samplerInfo.maxLod = maxLod;
-		samplerInfo.anisotropyEnable = ( anisotropy >= 1.0f ) ? VK_TRUE : VK_FALSE;
-		samplerInfo.maxAnisotropy = anisotropy;
-		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		samplerInfo.compareEnable = VK_FALSE;
-		samplerInfo.compareOp = VK_COMPARE_OP_LESS;
-		samplerInfo.unnormalizedCoordinates = VK_FALSE;
-		samplerInfo.pNext = nullptr;
-
-		VkSampler ret = VK_NULL_HANDLE;
-		vkCreateSampler( device, &samplerInfo, nullptr, &ret );
-
-		return ret;
 	}
 }

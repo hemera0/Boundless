@@ -28,9 +28,9 @@ namespace Boundless {
 
 		uint32_t m_Material{}; 
 
-		BufferHandle m_IndexBuffer{};
-		BufferHandle m_VertexBuffer{};
-		BufferHandle m_BlasBuffer{};
+		BufferHandle m_IndexBuffer  = BufferHandle::Invalid;
+		BufferHandle m_VertexBuffer = BufferHandle::Invalid;
+		BufferHandle m_BlasBuffer   = BufferHandle::Invalid;
 		VkAccelerationStructureKHR m_Blas{};
 
 		void PackVertexData();
@@ -47,27 +47,25 @@ namespace Boundless {
 		int m_Index{};
 		glm::vec3 m_Pad{};
 
-		float m_MetallicFactor{ 1.f };
-		float m_RoughnessFactor{ 1.f };
-		EAlphaMode m_AlphaMode{};
-		float m_AlphaCutoff{};
+		float m_MetallicFactor				= 1.f;
+		float m_RoughnessFactor				= 1.f;
+		EAlphaMode m_AlphaMode				= EAlphaMode::Opaque;
+		float m_AlphaCutoff					= 0.5f;
 
-		ImageHandle m_AlbedoTexture{};
-		ImageHandle m_NormalsTexture{};
-		ImageHandle m_MetalRoughnessTexture{};
-		ImageHandle m_EmissiveTexture{};
+		ImageHandle m_AlbedoTexture			= ImageHandle::Invalid;
+		ImageHandle m_NormalsTexture		= ImageHandle::Invalid;
+		ImageHandle m_MetalRoughnessTexture = ImageHandle::Invalid;
+		ImageHandle m_EmissiveTexture		= ImageHandle::Invalid;
 
-		glm::vec4 m_Albedo{1.f, 1.f, 1.f, 1.f};
-		glm::vec4 m_Emissive{0.f, 0.f, 0.f, 1.f};
+		glm::vec4 m_Albedo					= {1.f, 1.f, 1.f, 1.f};
+		glm::vec4 m_Emissive				= {0.f, 0.f, 0.f, 1.f};
 	};
 
-	struct alignas( 16 ) Material : GPUMaterial {
+	struct Material : GPUMaterial {
 		std::string m_AlbedoTexturePath{};
 		std::string m_NormalsTexturePath{};
 		std::string m_MetalRoughnessTexturePath{};
 		std::string m_EmissiveTexturePath{};
-
-		SamplerDesc m_AlbedoSampler{};
 	};
 
 	struct AnimationSampler {

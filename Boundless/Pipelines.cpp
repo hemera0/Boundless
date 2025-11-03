@@ -4,10 +4,6 @@
 namespace Boundless {
 	VkPipelineLayout PipelineLayoutBuilder::Build( const VkDevice& device ) {
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-		pipelineLayoutCreateInfo.setLayoutCount = 0; // Optional
-		pipelineLayoutCreateInfo.pSetLayouts = nullptr; // Optional
-		pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-		pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
 		if ( !m_DescriptorSets.empty() ) {
 			pipelineLayoutCreateInfo.setLayoutCount = static_cast< uint32_t >( m_DescriptorSets.size() );
@@ -30,15 +26,15 @@ namespace Boundless {
 	}
 
 	PipelineBuilder::PipelineBuilder() {
-		m_MultisampleState = VkUtil::PipelineDefaultMultiSampleState();
-		m_InputAssemblyState = VkUtil::PipelineDefaultInputAssemblyState();
-		m_RasterizationState = VkUtil::PipelineDefaultRasterizationState();
-		m_DepthStencilState = VkUtil::PipelineDefaultDepthStencilState();
-		m_DynamicState = VkUtil::PipelineDefaultDynamicState();
+		m_MultisampleState			 = VkUtil::PipelineDefaultMultiSampleState();
+		m_InputAssemblyState		 = VkUtil::PipelineDefaultInputAssemblyState();
+		m_RasterizationState		 = VkUtil::PipelineDefaultRasterizationState();
+		m_DepthStencilState			 = VkUtil::PipelineDefaultDepthStencilState();
+		m_DynamicState				 = VkUtil::PipelineDefaultDynamicState();
 		m_ColorBlendAttachmentStates = { VkUtil::PipelineDefaultColorBlendAttachmentState() };
 	}
 
-	VkPipeline PipelineBuilder::Build( const VkDevice& device, const VkSwapchainKHR& swapchain ) {
+	VkPipeline PipelineBuilder::Build( const VkDevice& device ) {
 		std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
 		std::vector<VkShaderModuleCreateInfo> shaderModules{};
 

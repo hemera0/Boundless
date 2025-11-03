@@ -6,16 +6,23 @@ namespace Boundless {
 		friend class Device;
 	public:
 		struct Desc {
-			VkDeviceSize m_Size{};
-			VkBufferUsageFlags m_Usage{};
-			VmaMemoryUsage m_MemoryUsage{};
-			bool m_Mappable{};
+			VkDeviceSize m_Size			 = 0;
+			VkBufferUsageFlags m_Usage	 = 0;
+			VmaMemoryUsage m_MemoryUsage = VMA_MEMORY_USAGE_AUTO;
+			bool m_Mappable				 = false;
+
+			bool operator==(const Desc& other) const {
+				return std::tie( m_Size, m_Usage, m_MemoryUsage, m_Mappable) == std::tie( other.m_Size, other.m_Usage, other.m_MemoryUsage, other.m_Mappable );
+			}
+
+			bool operator!=( const Desc& other ) const {
+				return std::tie( m_Size, m_Usage, m_MemoryUsage, m_Mappable ) != std::tie( other.m_Size, other.m_Usage, other.m_MemoryUsage, other.m_Mappable );
+			}
 		};
 
-		Buffer( const VkDevice& device, const VmaAllocator& allocator, const VkDeviceSize size, const VkBufferUsageFlags usage, const VmaMemoryUsage memoryUsage, bool mappable = false );
 		Buffer( const VkDevice& device, const VmaAllocator& allocator, const Buffer::Desc& bufferDesc );
 
-		~Buffer();
+		void Release();
 
 		void* Map();
 		void Unmap();
@@ -40,6 +47,6 @@ namespace Boundless {
 	class StagingBuffer : public Buffer {
 	public:
 		StagingBuffer( const VkDevice& device, const VmaAllocator& allocator, const VkDeviceSize size ) :
-			Buffer( device, allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO, true ) { }
+			Buffer( device, allocator, Buffer::Desc{ size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_AUTO, true } ) { }
 	};
 }

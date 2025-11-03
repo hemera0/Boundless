@@ -10,13 +10,11 @@ namespace Boundless {
 			printf( "Could not init DXC Library\n" );
 		}
 
-		// Initialize DXC compiler
 		hres = DxcCreateInstance( CLSID_DxcCompiler, IID_PPV_ARGS( m_Compiler.GetAddressOf() ) );
 		if ( FAILED( hres ) ) {
 			printf( "Could not init DXC Compiler\n" );
 		}
 
-		// Initialize DXC utility
 		hres = DxcCreateInstance( CLSID_DxcUtils, IID_PPV_ARGS( m_Utils.GetAddressOf() ) );
 		if ( FAILED( hres ) ) {
 			printf( "Could not init DXC Utiliy\n" );

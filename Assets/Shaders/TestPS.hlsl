@@ -11,6 +11,9 @@ struct PS_Input {
 
 PUSH_CONSTANTS(MainPassPushConstants, PushConstants);
 TEXTURE_POOL()
+
+// This is gross. But I am not sure if i can do this part bindlessly... 
+// Should only be one TLAS anyways I think...
 RTAS_POOL()
 
 static RaytracingAccelerationStructure TLAS = AccelerationStructures[0];
@@ -21,15 +24,15 @@ float4 main(PS_Input input) : SV_Target0 {
 
     float4 albedo = mat.Albedo;    
     if(mat.AlbedoTexture)
-        albedo *= TEXTURE_SAMPLE2D(mat.AlbedoTexture, input.UV);
+        albedo *= TEXTURE_SAMPLE2D(mat.AlbedoTexture, SAMPLER_ANISO_WRAP, input.UV);
 
     float4 emissive = mat.Emissive;
     if(mat.EmissiveTexture)
-        emissive *= TEXTURE_SAMPLE2D(mat.EmissiveTexture, input.UV);
+        emissive *= TEXTURE_SAMPLE2D(mat.EmissiveTexture, SAMPLER_ANISO_WRAP, input.UV);
 
 	float3 normal = normalize(input.Normal);
 	if(mat.NormalsTexture) {
-		float3 nmap = TEXTURE_SAMPLE2D(mat.NormalsTexture, input.UV).rgb * 2.f - 1.f;
+		float3 nmap = TEXTURE_SAMPLE2D(mat.NormalsTexture, SAMPLER_ANISO_WRAP, input.UV).rgb * 2.f - 1.f;
 
 		// Calc tangent
 		// I think this method is good enough but could switch to calculating these using mikktspace.
@@ -49,7 +52,7 @@ float4 main(PS_Input input) : SV_Target0 {
 	float metallic = 0.f;
 	float roughness = 1.f;	
 	if(mat.MetalRoughnessTexture) {
-		float3 mr = TEXTURE_SAMPLE2D(mat.MetalRoughnessTexture, input.UV).rgb;
+		float3 mr = TEXTURE_SAMPLE2D(mat.MetalRoughnessTexture, SAMPLER_ANISO_WRAP, input.UV).rgb;
 		metallic = mr.b * mat.MetallicFactor;
 		roughness = mr.g * mat.RoughnessFactor;
 	}
@@ -62,18 +65,18 @@ float4 main(PS_Input input) : SV_Target0 {
 	material.LoadData(albedo.rgb, normal, metallic, roughness);
 	
 	float3 wi = normalize(-scene.SunDirection.xyz);
-    float3 wo = normalize(scene.CameraPosition.xyz - input.WorldPos.xyz );
+    float3 wo = normalize(scene.CameraPosition.xyz - input.WorldPos.xyz);
     float3 radiance = emissive.rgb;
 
 	// RayQuery shadows...
 	RayDesc ray;
-    ray.TMin = 0.001f;
+    ray.TMin = 0.01f;
     ray.TMax = 1000.0;
     ray.Origin = input.WorldPos.xyz;	
     ray.Direction = wi;
 
     uint ray_flags = RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
-    RayQuery< RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER > query;
+    RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> query;
 
     query.TraceRayInline(TLAS, ray_flags, 0xFF, ray);
     query.Proceed();
@@ -88,16 +91,16 @@ float4 main(PS_Input input) : SV_Target0 {
 	int specularMap = scene.IblTextures.y;
 	int brdfLut = scene.IblTextures.z;
 
-	float iblIntensity = 0.75f;
+	float iblIntensity = 0.5f;
 
 	radiance += material.CalculateIndirectLight( 
-		TexturePoolSamplers[ diffuseMap ], 
-		TexturePoolSamplers[ brdfLut ], 
+		TexturePoolSamplers[ SAMPLER_ANISO_CLAMP ], 
+		TexturePoolSamplers[ SAMPLER_LINEAR_CLAMP ], 
 		TexturePoolCube[ diffuseMap ], 
 		TexturePoolCube[ specularMap ], 
 		TexturePool2D[ brdfLut ], 
 		wo
-	);
+	) * iblIntensity;
 
 	// normal * 0.5f + 0.5f
     return float4( radiance, 1.f );

@@ -2,10 +2,16 @@
 #include "Pch.hpp"
 
 // Generic Vulkan boilerplate code.
-enum class ResourceHandle : uint32_t { Invalid = 0 };
+enum class ResourceHandle : uint32_t { Invalid = 0xFFFFFFFF };
 
 using BufferHandle = ResourceHandle;
 using ImageHandle = ResourceHandle;
+
+// Temp. idk im tired where put
+struct Viewport {
+	VkOffset2D Offset;
+	VkExtent2D Size;
+};
 
 namespace VkUtil {
 	struct QueueFamilyIndices_t {
@@ -58,6 +64,7 @@ namespace VkUtil {
 	VkImageView CreateImageView( const VkDevice& device, const VkImage& image, VkImageViewCreateInfo* createInfo );
 
 	// Command Buffer Helpers...
+	// TODO: Make a good CommandBuffer abstraction 
 	void CommandBufferBegin( const VkCommandBuffer& commandBuffer, VkCommandBufferUsageFlags flags = 0 );
 	void CommandBufferEnd( const VkCommandBuffer& commandBuffer );
 	void CommandBufferSubmit( const VkCommandBuffer& commandBuffer, const VkQueue& queue, bool wait = true );
@@ -83,6 +90,4 @@ namespace VkUtil {
 	VkPipelineDepthStencilStateCreateInfo PipelineDefaultDepthStencilState();
 	VkPipelineDynamicStateCreateInfo PipelineDefaultDynamicState();
 	VkPipelineColorBlendAttachmentState PipelineDefaultColorBlendAttachmentState();
-
-	VkSampler CreateSampler( const VkDevice& device, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkFilter filter = VK_FILTER_LINEAR, float anisotropy = 4.f, float minLod = 0.f, float maxLod = VK_LOD_CLAMP_NONE );
 }

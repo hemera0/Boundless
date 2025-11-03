@@ -31,6 +31,12 @@
     <Filter Include="Source Files\Importers">
       <UniqueIdentifier>{8f5350d7-5cc6-4ca5-9e4e-f8abbf6b61e5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Vulkan\RenderPasses">
+      <UniqueIdentifier>{6422e1b1-6a93-4b79-9385-70226e646ee8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Vulkan\RenderPasses">
+      <UniqueIdentifier>{48aa3419-4449-4a2f-897d-fbfc8072b924}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -75,8 +81,8 @@
     <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderGraph.cpp">
-      <Filter>Source Files\Vulkan</Filter>
+    <ClCompile Include="RenderPasses.cpp">
+      <Filter>Source Files\Vulkan\RenderPasses</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -125,8 +131,11 @@
     <ClInclude Include="Input.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RenderGraph.hpp">
-      <Filter>Header Files\Vulkan</Filter>
+    <ClInclude Include="BaseRenderPass.hpp">
+      <Filter>Header Files\Vulkan\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPasses.hpp">
+      <Filter>Header Files\Vulkan\RenderPasses</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

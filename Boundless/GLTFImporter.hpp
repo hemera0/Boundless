@@ -13,7 +13,7 @@ namespace Boundless {
 		void LoadMesh(entt::entity entity, const tinygltf::Model& model, const tinygltf::Primitive& primitive);
 		void LoadMaterials( entt::entity entity, const tinygltf::Model& model );
 		void LoadAnimations( entt::entity entity, const tinygltf::Model& model );
-		void LoadNode( entt::entity parent, const tinygltf::Model& model, const tinygltf::Node& node, glm::mat4 parentTransform );
+		void LoadNode( entt::entity parent, const tinygltf::Model& model, const tinygltf::Node& node );
 
 		Scene& m_Scene;
 		std::string m_BaseDir{};

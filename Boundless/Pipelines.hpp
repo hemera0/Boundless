@@ -10,8 +10,8 @@ namespace Boundless {
 
 		VkPipelineLayout Build( const VkDevice& device );
 	private:
-		std::vector<VkDescriptorSetLayout> m_DescriptorSets{};
-		std::vector<VkPushConstantRange> m_PushConstants{};
+		std::vector<VkDescriptorSetLayout> m_DescriptorSets;
+		std::vector<VkPushConstantRange>   m_PushConstants;
 	};
 
 	class PipelineBuilder {
@@ -32,24 +32,25 @@ namespace Boundless {
 		PipelineBuilder& SetColorBlendAttachmentStates( const std::vector<VkPipelineColorBlendAttachmentState>& colorBlendAttachmentStates ) { m_ColorBlendAttachmentStates = colorBlendAttachmentStates; return *this; }
 		PipelineBuilder& SetColorBlendState( const VkPipelineColorBlendStateCreateInfo& colorBlendState ) { m_ColorBlendState = colorBlendState; return *this; }
 		
-		VkPipeline Build( const VkDevice& device, const VkSwapchainKHR& swapchain );
+		VkPipeline Build( const VkDevice& device );
 	private:
-		std::vector<std::pair<IDxcBlob*, VkShaderStageFlagBits>> m_ShaderBlobs{};
+		using ShaderBlobInfo = std::pair<IDxcBlob*, VkShaderStageFlagBits>;
+		std::vector<ShaderBlobInfo> m_ShaderBlobs;
 
-		std::vector<VkFormat> m_ColorFormats{};
-		VkFormat m_DepthFormat{};
+		std::vector<VkFormat> m_ColorFormats;
+		VkFormat		      m_DepthFormat = VK_FORMAT_UNDEFINED;
 
-		VkPipelineLayout m_PipelineLayout{};
-		std::vector<VkVertexInputAttributeDescription> m_InputAttributeDescriptions{};
-		std::vector<VkVertexInputBindingDescription> m_InputBindingDescriptions{};
+		std::vector<VkVertexInputAttributeDescription>   m_InputAttributeDescriptions;
+		std::vector<VkVertexInputBindingDescription>     m_InputBindingDescriptions;
+		
+		VkPipelineMultisampleStateCreateInfo             m_MultisampleState = {};
+		VkPipelineInputAssemblyStateCreateInfo		     m_InputAssemblyState = {};
+		VkPipelineRasterizationStateCreateInfo			 m_RasterizationState = {};
+		VkPipelineDepthStencilStateCreateInfo			 m_DepthStencilState = {};
+		VkPipelineDynamicStateCreateInfo				 m_DynamicState = {};
 
-		VkPipelineMultisampleStateCreateInfo m_MultisampleState{};
-		VkPipelineInputAssemblyStateCreateInfo m_InputAssemblyState{};
-		VkPipelineRasterizationStateCreateInfo m_RasterizationState{};
-		VkPipelineDepthStencilStateCreateInfo m_DepthStencilState{};
-		VkPipelineDynamicStateCreateInfo m_DynamicState{};
-
-		std::vector<VkPipelineColorBlendAttachmentState> m_ColorBlendAttachmentStates{};
-		VkPipelineColorBlendStateCreateInfo m_ColorBlendState{};
+		std::vector<VkPipelineColorBlendAttachmentState> m_ColorBlendAttachmentStates;
+		VkPipelineColorBlendStateCreateInfo				 m_ColorBlendState = {};
+		VkPipelineLayout							     m_PipelineLayout = {};
 	};
 }

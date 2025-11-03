@@ -13,32 +13,25 @@ namespace Boundless {
 	
 		m_BaseDir = std::filesystem::path( path ).remove_filename().string();
 
-		bool isBinary = std::filesystem::path( path ).extension() == ".glb";
-		bool result = false;
+		if ( !loader.LoadASCIIFromFile( &model, &err, &warn, path ) ) {
+			if ( !warn.empty() )
+				printf( "[GLTF] warn: %s\n", warn.c_str() );
 
-		if( isBinary ){
-			result = loader.LoadBinaryFromFile(&model, &err, &warn, path );
-		} else {
-			result = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+			if(!err.empty())
+				printf("[GLTF] error: %s\n", err.c_str());
+
+			return false;
 		}
 
-		auto& registry = m_Scene.GetRegistry();
+		entt::entity root = m_Scene.GetRootEntity();
 
-		entt::entity rootEntity = registry.create();
-
-		LoadMaterials( rootEntity, model );
-		LoadAnimations( rootEntity, model );
+		LoadMaterials( root, model );
+		LoadAnimations( root, model );
 
 		const auto& scene = model.scenes[model.defaultScene == -1 ? 0 : model.defaultScene ];
-
-		glm::mat4 rootTransform(1.f);
-
 		for(auto i = 0; i < scene.nodes.size(); i++) {
-			LoadNode( rootEntity, model, model.nodes[scene.nodes[i]], rootTransform );
+			LoadNode( root, model, model.nodes[scene.nodes[i]] );
 		}
-
-		if(!result)
-			return false;
 
 		return true;
 	}
@@ -53,9 +46,9 @@ namespace Boundless {
 			if (index < 0)
 				continue;
 
-			const auto& accessor = model.accessors[ index ];
-			const auto& bufferView = model.bufferViews[ accessor.bufferView ];
-			const float* buffer = reinterpret_cast< const float* >( &( model.buffers[ bufferView.buffer ].data[ accessor.byteOffset + bufferView.byteOffset ] ) );
+			const auto& accessor	= model.accessors[ index ];
+			const auto& bufferView	= model.bufferViews[ accessor.bufferView ];
+			const float* buffer		= reinterpret_cast< const float* >( &( model.buffers[ bufferView.buffer ].data[ accessor.byteOffset + bufferView.byteOffset ] ) );
 
 			for( auto i = 0; i < accessor.count; i++ ) {
 				if ( type == "POSITION" ) {
@@ -73,22 +66,22 @@ namespace Boundless {
 		}
 
 		if( primitive.indices > -1 ) {
-			const auto& accessor = model.accessors[ primitive.indices ];
-			const auto& bufferView = model.bufferViews[ accessor.bufferView ];
-			const uint32_t* dataPtr = reinterpret_cast< const uint32_t* >( &( model.buffers[ bufferView.buffer ].data[ accessor.byteOffset + bufferView.byteOffset ] ) );
+			const auto& accessor	= model.accessors[ primitive.indices ];
+			const auto& bufferView	= model.bufferViews[ accessor.bufferView ];
+			const uint32_t* buffer = reinterpret_cast< const uint32_t* >( &( model.buffers[ bufferView.buffer ].data[ accessor.byteOffset + bufferView.byteOffset ] ) );
 
 			for ( uint32_t i = 0; i < accessor.count; i++ ) {
 				if ( accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT ) {
-					mesh.m_Indices.push_back( dataPtr[ i ] );
+					mesh.m_Indices.push_back( buffer[ i ] );
 				}
 
 				if ( accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT ) {
-					const uint16_t* buf = reinterpret_cast< const uint16_t* >( dataPtr );
+					const uint16_t* buf = reinterpret_cast< const uint16_t* >( buffer );
 					mesh.m_Indices.push_back( buf[ i ] );
 				}
 
 				if ( accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE ) {
-					const uint8_t* buf = reinterpret_cast< const uint8_t* >( dataPtr );
+					const uint8_t* buf = reinterpret_cast< const uint8_t* >( buffer );
 					mesh.m_Indices.push_back( buf[ i ] );
 				}
 			}
@@ -118,82 +111,33 @@ namespace Boundless {
 
 			const auto& pbrMetallicRoughness = srcMaterial.pbrMetallicRoughness;
 			const auto& emissiveFactor = srcMaterial.emissiveFactor;
-
 			const auto& baseColorFactor = pbrMetallicRoughness.baseColorFactor;
 
-			dstMaterial.m_Albedo = glm::vec4( baseColorFactor[ 0 ], baseColorFactor[ 1 ], baseColorFactor[ 2 ], baseColorFactor[ 3 ] );
-			dstMaterial.m_Emissive = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 0.f );
-
-			// if ( srcMaterial.extensions.find( "KHR_materials_emissive_strength" ) != srcMaterial.extensions.cend() ) {
-			// 	float emissiveStrength = static_cast<float>(srcMaterial.extensions.at( "KHR_materials_emissive_strength" ).Get( "emissiveStrength" ).GetNumberAsDouble());
-			// 	dstMaterial.m_Emissive *= emissiveStrength;
-			// }
-
-			dstMaterial.m_MetallicFactor = static_cast< float >( pbrMetallicRoughness.metallicFactor );
+			dstMaterial.m_Albedo		  = glm::vec4( baseColorFactor[ 0 ], baseColorFactor[ 1 ], baseColorFactor[ 2 ], baseColorFactor[ 3 ] );
+			dstMaterial.m_Emissive		  = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 0.f );
+			dstMaterial.m_MetallicFactor  = static_cast< float >( pbrMetallicRoughness.metallicFactor );
 			dstMaterial.m_RoughnessFactor = static_cast< float >( pbrMetallicRoughness.roughnessFactor );
+			dstMaterial.m_AlphaCutoff	  = static_cast< float >( srcMaterial.alphaCutoff );
 
-			dstMaterial.m_AlphaCutoff = static_cast< float >( srcMaterial.alphaCutoff );
-
-			dstMaterial.m_AlbedoTexturePath = "";
-			dstMaterial.m_NormalsTexturePath = "";
+			dstMaterial.m_AlbedoTexturePath			= "";
+			dstMaterial.m_NormalsTexturePath		= "";
 			dstMaterial.m_MetalRoughnessTexturePath = "";
-			dstMaterial.m_EmissiveTexturePath = "";
+			dstMaterial.m_EmissiveTexturePath		= "";
 
-			// TODO: Better texture loading
 			if ( pbrMetallicRoughness.baseColorTexture.index > -1 ) {
 				const auto& texture = model.textures[ pbrMetallicRoughness.baseColorTexture.index ];
-				
-				if(texture.sampler > -1) {
-					auto& sampler = model.samplers[ texture.sampler ];
-
-					const auto GetFilterType = [] (int filter) -> VkFilter {
-						switch(filter) {
-						case TINYGLTF_TEXTURE_FILTER_NEAREST:
-							return VK_FILTER_NEAREST;
-						case TINYGLTF_TEXTURE_FILTER_LINEAR:
-							return VK_FILTER_LINEAR;
-						}
-
-						return VK_FILTER_LINEAR;
-					};
-				
-					const auto GetRepeatType = [](int wrap) -> VkSamplerAddressMode {
-						switch(wrap) {
-						case TINYGLTF_TEXTURE_WRAP_REPEAT:
-							return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-						case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-							return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-						case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-							return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-						}
-
-						return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-					};
-
-					dstMaterial.m_AlbedoSampler = {
-						.m_MinFilter = GetFilterType( sampler.minFilter ),
-						.m_MagFilter = GetFilterType( sampler.magFilter ),
-						.m_WrapS = GetRepeatType( sampler.wrapS ),
-						.m_WrapT = GetRepeatType( sampler.wrapT )
-					};
-				} else {
-					dstMaterial.m_AlbedoSampler = {
-						.m_MinFilter = VK_FILTER_LINEAR,
-						.m_MagFilter = VK_FILTER_LINEAR,
-						.m_WrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-						.m_WrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-					};
-				}
-
 				dstMaterial.m_AlbedoTexturePath = m_BaseDir + model.images[texture.source].uri;
 			}
 
-			if ( pbrMetallicRoughness.metallicRoughnessTexture.index > -1 )
-				dstMaterial.m_MetalRoughnessTexturePath = m_BaseDir + model.images[ model.textures[ pbrMetallicRoughness.metallicRoughnessTexture.index ].source ].uri;
-			if ( srcMaterial.normalTexture.index > -1 )
-				dstMaterial.m_NormalsTexturePath = m_BaseDir + model.images[model.textures[srcMaterial.normalTexture.index].source].uri;
-			if ( srcMaterial.emissiveTexture.index > -1 )
-				dstMaterial.m_EmissiveTexturePath = m_BaseDir + model.images[model.textures[srcMaterial.emissiveTexture.index].source].uri;
+			const auto& images = model.images;
+			const auto& textures = model.textures;
+
+			if ( const auto index = pbrMetallicRoughness.metallicRoughnessTexture.index; index > -1 )
+				dstMaterial.m_MetalRoughnessTexturePath = m_BaseDir + images[ textures[ index ].source ].uri;
+			if ( const auto index = srcMaterial.normalTexture.index; index > -1 )
+				dstMaterial.m_NormalsTexturePath = m_BaseDir + images[ textures[ index ].source ].uri;
+			if ( const auto index = srcMaterial.emissiveTexture.index; index > -1 )
+				dstMaterial.m_EmissiveTexturePath = m_BaseDir + images[ textures[ index ].source ].uri;
 
 			m_Materials.push_back(matEntity);
 		}
@@ -203,12 +147,14 @@ namespace Boundless {
 
 	}
 
-	void GLTFImporter::LoadNode( entt::entity parent, const tinygltf::Model& model, const tinygltf::Node& node, glm::mat4 nodeTransform ) {
+	void GLTFImporter::LoadNode( entt::entity parent, const tinygltf::Model& model, const tinygltf::Node& node ) {
 		auto& registry = m_Scene.GetRegistry();
 
-		entt::entity nodeEntity = registry.create();
-
 		glm::mat4 localTransform(1.f);
+		bool hasTransform = ( node.matrix.size() == 16 ) || 
+			( node.translation.size() == 3 ) || 
+			( node.rotation.size() == 4) || 
+			( node.scale.size() == 3);
 
 		if( node.matrix.size() == 16) {
 			localTransform = glm::make_mat4(node.matrix.data());
@@ -222,28 +168,34 @@ namespace Boundless {
 			}
 		}
 
-		nodeTransform *= localTransform;
+		entt::entity entity = parent;
+		if( hasTransform || ( node.mesh > -1 && registry.all_of<Mesh>( parent ) ) ) {
+			entity = m_Scene.CreateGameObject();
+			m_Scene.ParentTo( entity, parent );
+		}
 
-		// TODO: Transform components and parenting...
-		auto& transform = registry.emplace<Transform>(nodeEntity);
-
-		transform.m_WorldTransform = nodeTransform;
+		if(hasTransform) {
+			Transform& transform = registry.get<Transform>(entity);
+			transform.m_LocalTransform = localTransform;
+		}
 
 		if( node.mesh > -1 ) {
 			const auto& mesh = model.meshes[ node.mesh ];
 
 			if( mesh.primitives.size() == 1) {
-				LoadMesh(nodeEntity, model, mesh.primitives[0]);
+				LoadMesh( entity, model, mesh.primitives[0]);
 			} else if( mesh.primitives.size() > 1 ) {
 				for( auto i = 0; i < mesh.primitives.size(); i++ ) {
-					entt::entity submeshEntity = registry.create();
-					LoadMesh(submeshEntity, model, mesh.primitives[i]);
+					entt::entity subEntity = m_Scene.CreateGameObject();
+					
+					LoadMesh( subEntity, model, mesh.primitives[i]);
+					m_Scene.ParentTo( subEntity, entity );
 				}
 			}
 		}
 
 		for(auto i = 0; i < node.children.size(); i++) {
-			LoadNode(nodeEntity, model, model.nodes[node.children[i]], nodeTransform);
+			LoadNode(entity, model, model.nodes[node.children[i]]);
 		}
 	}
 }

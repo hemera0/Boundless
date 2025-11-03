@@ -14,11 +14,11 @@ int main() {
 	s_Engine = std::make_shared<Boundless::Engine>();
 	s_Engine->Create();
 
-	static float oldTime = glfwGetTime();
+	static float oldTime = static_cast<float>( glfwGetTime() );
 
 	while ( !s_Engine->ShouldExit() ) {
-		float dt = glfwGetTime() - oldTime;
-		oldTime = glfwGetTime();
+		float dt = static_cast<float>( glfwGetTime() ) - oldTime;
+		oldTime = static_cast<float>( glfwGetTime() );
 
 		s_Engine->Tick(dt);
 

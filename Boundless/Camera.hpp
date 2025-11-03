@@ -3,19 +3,6 @@
 
 
 namespace Boundless {
-	inline glm::mat4 PerspectiveProjection(float fovY, float aspect, float nearZ) {
-		float f = 1.0f / glm::tan( glm::radians( fovY ) * 0.5f );
-
-		glm::mat4 result( 0.0f );
-		result[ 0 ][ 0 ] = f / aspect;
-		result[ 1 ][ 1 ] = f;
-		result[ 2 ][ 2 ] = 0.0f;
-		result[ 2 ][ 3 ] = -1.0f;
-		result[ 3 ][ 2 ] = nearZ;
-	
-		return result;
-	}
-
 	class Camera {
 	public:
 		static Camera StationaryLookAtCamera(

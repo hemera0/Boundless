@@ -57,7 +57,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>VK_USE_PLATFORM_WIN32_KHR;GLFW_EXPOSE_NATIVE_WIN32;GLM_FORCE_RADIANS;GLM_FORCE_DEPTH_ZERO_TO_ONE;NOMINMAX;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <PrecompiledHeader>Create</PrecompiledHeader>
@@ -104,12 +104,13 @@
     <ClCompile Include="OBJImporter.cpp" />
     <ClCompile Include="Pch.cpp" />
     <ClCompile Include="Pipelines.cpp" />
-    <ClCompile Include="RenderGraph.cpp" />
+    <ClCompile Include="RenderPasses.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="VkUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BaseRenderPass.hpp" />
     <ClInclude Include="Buffer.hpp" />
     <ClInclude Include="Camera.hpp" />
     <ClInclude Include="Device.hpp" />
@@ -121,7 +122,7 @@
     <ClInclude Include="OBJImporter.hpp" />
     <ClInclude Include="Pch.hpp" />
     <ClInclude Include="Pipelines.hpp" />
-    <ClInclude Include="RenderGraph.hpp" />
+    <ClInclude Include="RenderPasses.hpp" />
     <ClInclude Include="Scene.hpp" />
     <ClInclude Include="Shaders.hpp" />
     <ClInclude Include="Transform.hpp" />
