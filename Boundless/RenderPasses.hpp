@@ -19,8 +19,8 @@ namespace Boundless {
 
 	struct LightingPushConstants {
 		VkDeviceAddress m_SceneBuffer;
-		uint32_t m_GBufferTexture;
-		uint32_t m_GBufferDepthTexture;
+		uint32_t		m_GBufferTexture;
+		uint32_t		m_GBufferDepthTexture;
 	};
 
 	struct CompositePushConstants {
@@ -35,17 +35,10 @@ namespace Boundless {
 
 	class GBufferPass : public BaseRenderPass {
 	public:
-		GBufferPass(const Viewport& viewport);
+		GBufferPass( const Viewport& viewport );
 		
 		virtual void CreatePassResources( Device& device ) override;
-
-		void Render( VkCommandBuffer commandBuffer, Device& device, Scene& scene );
-
-		ImageHandle GetGBuffer() const { return m_RenderTargets[ 0 ]; }
-		ImageHandle GetGBufferView() const { return m_RenderTargetViews[ 0 ]; }
-	private:
-		VkPipelineLayout m_PipelineLayout;
-		VkPipeline	     m_Pipeline;
+		void Render( CommandBuffer& commandBuffer, Device& device, Scene& scene );
 	};
 
 	class GBufferDebugPass : public BaseRenderPass {
@@ -53,14 +46,7 @@ namespace Boundless {
 		GBufferDebugPass( const Viewport& viewport );
 
 		virtual void CreatePassResources( Device& device ) override;
-
-		void Render( VkCommandBuffer commandBuffer, Device& device, ImageHandle gbufferTexture, ImageHandle depthTexture, uint32_t channelIndex );
-
-		ImageHandle GetRenderTarget() const { return m_RenderTargets[ 0 ]; }
-		ImageHandle GetRenderTargetView() const { return m_RenderTargetViews[ 0 ]; }
-	private:
-		VkPipelineLayout m_PipelineLayout;
-		VkPipeline	     m_Pipeline;
+		void Render( CommandBuffer& commandBuffer, Device& device, ImageHandle gbufferTexture, ImageHandle depthTexture, uint32_t channelIndex );
 	};
 
 	class LightingPass : public BaseRenderPass {
@@ -68,14 +54,7 @@ namespace Boundless {
 		LightingPass( const Viewport& viewport );
 	
 		virtual void CreatePassResources( Device& device ) override;
-
-		void Render( VkCommandBuffer commandBuffer, Device& device, Scene& scene, ImageHandle gbufferTexture, ImageHandle depthTexture );
-
-		ImageHandle GetRenderTarget() const { return m_RenderTargets[ 0 ]; }
-		ImageHandle GetRenderTargetView() const { return m_RenderTargetViews[ 0 ]; }
-	private:
-		VkPipelineLayout m_PipelineLayout;
-		VkPipeline	     m_Pipeline;
+		void Render( CommandBuffer& commandBuffer, Device& device, Scene& scene, ImageHandle gbufferTexture, ImageHandle depthTexture );
 	};
 
 	class CompositePass : public BaseRenderPass {
@@ -83,28 +62,6 @@ namespace Boundless {
 		CompositePass( const Viewport& viewport );
 
 		virtual void CreatePassResources( Device& device ) override;
-
-		void Render( VkCommandBuffer commandBuffer, Device& device, ImageHandle texture );
-
-		ImageHandle GetRenderTarget() const { return m_RenderTargets[ 0 ]; }
-		ImageHandle GetRenderTargetView() const { return m_RenderTargetViews[ 0 ]; }
-	private:
-		VkPipelineLayout m_PipelineLayout;
-		VkPipeline	     m_Pipeline;
+		void Render( CommandBuffer& commandBuffer, Device& device, ImageHandle texture );
 	};
-
-	//class FullScreenPresentPass : public BaseRenderPass {
-	//public:
-	//	FullScreenPresentPass( const Viewport& viewport );
-
-	//	virtual void CreatePassResources( Device& device ) override;
-
-	//	void Render( VkCommandBuffer commandBuffer, Device& device, ImageHandle texture );
-
-	//	ImageHandle GetGBuffer() const { return m_RenderTargets[ 0 ]; }
-	//	ImageHandle GetGBufferView() const { return m_RenderTargetViews[ 0 ]; }
-	//private:
-	//	VkPipelineLayout m_PipelineLayout;
-	//	VkPipeline	     m_Pipeline;
-	//};
 }

@@ -4,6 +4,10 @@
 PUSH_CONSTANTS(LightingPushConstants, pc);
 TEXTURE_POOL()
 
+RTAS_POOL()
+
+static RaytracingAccelerationStructure TLAS = AccelerationStructures[0];
+
 float4 main(FullScreenPSInput input) : SV_Target0 {
     SceneData scene = pc.Scene.Get();
 
@@ -37,8 +41,20 @@ float4 main(FullScreenPSInput input) : SV_Target0 {
     float3 wo = normalize(scene.CameraPosition.xyz - worldPos.xyz);
     float3 radiance = emissive.rgb;
 
-    // From old rayquery test
-    bool hit = false;
+    // Rayquery shadows.
+	// RayDesc ray;
+    // ray.TMin = 0.01f;
+    // ray.TMax = 1000.0;
+    // ray.Origin = worldPos.xyz;	
+    // ray.Direction = wi;
+
+    // uint rayFlags = RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
+    // RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> query;
+
+    // query.TraceRayInline(TLAS, rayFlags, 0xFF, ray);
+    // query.Proceed();
+
+	bool hit = false; // query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
 
     // Directional Light 
     radiance += material.CalculateDirectionalLight(wi, wo, scene.SunColor.rgb, hit);

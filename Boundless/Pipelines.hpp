@@ -15,6 +15,7 @@ namespace Boundless {
 	};
 
 	class PipelineBuilder {
+		using ShaderBlobInfo = std::pair<IDxcBlob*, VkShaderStageFlagBits>;
 	public:
 		PipelineBuilder();
 
@@ -34,21 +35,16 @@ namespace Boundless {
 		
 		VkPipeline Build( const VkDevice& device );
 	private:
-		using ShaderBlobInfo = std::pair<IDxcBlob*, VkShaderStageFlagBits>;
-		std::vector<ShaderBlobInfo> m_ShaderBlobs;
-
-		std::vector<VkFormat> m_ColorFormats;
-		VkFormat		      m_DepthFormat = VK_FORMAT_UNDEFINED;
-
+		std::vector<ShaderBlobInfo>						 m_ShaderBlobs;
+		std::vector<VkFormat>							 m_ColorFormats;
+		VkFormat										 m_DepthFormat = VK_FORMAT_UNDEFINED;
 		std::vector<VkVertexInputAttributeDescription>   m_InputAttributeDescriptions;
 		std::vector<VkVertexInputBindingDescription>     m_InputBindingDescriptions;
-		
 		VkPipelineMultisampleStateCreateInfo             m_MultisampleState = {};
 		VkPipelineInputAssemblyStateCreateInfo		     m_InputAssemblyState = {};
 		VkPipelineRasterizationStateCreateInfo			 m_RasterizationState = {};
 		VkPipelineDepthStencilStateCreateInfo			 m_DepthStencilState = {};
 		VkPipelineDynamicStateCreateInfo				 m_DynamicState = {};
-
 		std::vector<VkPipelineColorBlendAttachmentState> m_ColorBlendAttachmentStates;
 		VkPipelineColorBlendStateCreateInfo				 m_ColorBlendState = {};
 		VkPipelineLayout							     m_PipelineLayout = {};

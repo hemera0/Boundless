@@ -115,9 +115,9 @@ namespace Boundless {
 
 			dstMaterial.m_Albedo		  = glm::vec4( baseColorFactor[ 0 ], baseColorFactor[ 1 ], baseColorFactor[ 2 ], baseColorFactor[ 3 ] );
 			dstMaterial.m_Emissive		  = glm::vec4( emissiveFactor[ 0 ], emissiveFactor[ 1 ], emissiveFactor[ 2 ], 0.f );
-			dstMaterial.m_MetallicFactor  = static_cast< float >( pbrMetallicRoughness.metallicFactor );
-			dstMaterial.m_RoughnessFactor = static_cast< float >( pbrMetallicRoughness.roughnessFactor );
-			dstMaterial.m_AlphaCutoff	  = static_cast< float >( srcMaterial.alphaCutoff );
+			dstMaterial.m_MetallicFactor  = float( pbrMetallicRoughness.metallicFactor );
+			dstMaterial.m_RoughnessFactor = float( pbrMetallicRoughness.roughnessFactor );
+			dstMaterial.m_AlphaCutoff	  = float( srcMaterial.alphaCutoff );
 
 			dstMaterial.m_AlbedoTexturePath			= "";
 			dstMaterial.m_NormalsTexturePath		= "";

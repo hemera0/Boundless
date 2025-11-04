@@ -1,6 +1,5 @@
 #include "Pch.hpp"
 #include "RenderPasses.hpp"
-
 #include "Engine.hpp"
 
 namespace Boundless {
@@ -27,33 +26,18 @@ namespace Boundless {
 		BaseRenderPass::CreatePassResources( device );
 		
 		VkDevice deviceHandle = device.GetDevice();
-		
-		m_PipelineLayout = PipelineLayoutBuilder()
-			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( GBufferPushConstants ) } } )
-			.SetDescriptorSets( { device.GetTexturePoolLayout() } )
-			.Build( deviceHandle );
-
-		std::vector<VkFormat> rtFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
-
-		m_Pipeline = PipelineBuilder{}
+		m_Pipeline = m_PipelineBuilder
 			.SetShaderBlobs( { { g_EngineShaders.GBufferPixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.GBufferVertexShader , VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetColorAttachmentFormats( rtFormats )
-			.SetDepthAttachmentFormat( m_DepthDesc.m_Format )
-			.SetPipelineLayout( m_PipelineLayout )
-			// .SetMultisampleState( MSAAState )
-			.Build( deviceHandle );	
+			.Build( deviceHandle );
 	}
 
-
-	void GBufferPass::Render( VkCommandBuffer commandBuffer, Device& device, Scene& scene ) {
+	void GBufferPass::Render( CommandBuffer& commandBuffer, Device& device, Scene& scene ) {
 		BeginRendering( commandBuffer, device );
 		
-		// This is a little ugly I think.
-		VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, float( m_Viewport.Size.width ), float( m_Viewport.Size.height ) );
+		commandBuffer.SetScissorAndViewport(m_Viewport);
+		commandBuffer.BindPipeline(m_Pipeline);
 
-		VkDescriptorSet texturePool = device.GetTexturePool();
-		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline );
-		vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &texturePool, 0, nullptr );
+		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_BACK_BIT );
 
 		auto& registry = scene.GetRegistry();
 
@@ -72,18 +56,19 @@ namespace Boundless {
 			VkDeviceAddress vertexBuffer   = device.GetBuffer( mesh.m_VertexBuffer ).GetDeviceAddress();
 			uint32_t materialIndex		   = mesh.m_Material;
 
-			GBufferPushConstants pushConstants = {
+			GBufferPushConstants pc = {
 				sceneUniforms,
 				sceneMaterials,
 				vertexBuffer,
 				materialIndex
 			};
 
-			vkCmdPushConstants( commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( GBufferPushConstants ), &pushConstants );
+			commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
 
 			if ( !mesh.m_Indices.empty() ) {
 				Buffer& indexBuffer = device.GetBuffer( mesh.m_IndexBuffer );
-				vkCmdBindIndexBuffer( commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
+				commandBuffer.BindIndexBuffer( indexBuffer );
+
 				vkCmdDrawIndexed( commandBuffer, uint32_t( mesh.m_Indices.size() ), 1, 0, 0, 0 );
 			} else {
 				vkCmdDraw( commandBuffer, uint32_t( mesh.m_Vertices.size() ), 1, 0, 0 );
@@ -110,34 +95,16 @@ namespace Boundless {
 		BaseRenderPass::CreatePassResources(device);
 
 		VkDevice deviceHandle = device.GetDevice();
-
-		m_PipelineLayout = PipelineLayoutBuilder()
-			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( GBufferDebugPushConstants ) } } )
-			.SetDescriptorSets( { device.GetTexturePoolLayout() } )
-			.Build( deviceHandle );
-
-		std::vector<VkFormat> rtFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
-
-		auto fullscreenRasterization = VkUtil::PipelineDefaultRasterizationState();
-		fullscreenRasterization.cullMode = VK_CULL_MODE_FRONT_BIT;
-		fullscreenRasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-		m_Pipeline = PipelineBuilder{}
+		m_Pipeline = m_PipelineBuilder
 			.SetShaderBlobs( { { g_EngineShaders.GBufferDebugPixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.FullscreenTriVertexShader, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetRasterizationState( fullscreenRasterization )
-			.SetColorAttachmentFormats( rtFormats )
-			.SetPipelineLayout( m_PipelineLayout )
 			.Build( deviceHandle );
 	}
 	
-	void GBufferDebugPass::Render( VkCommandBuffer commandBuffer, Device& device, ImageHandle gbufferTexture, ImageHandle depthTexture, uint32_t channelIndex ) {
+	void GBufferDebugPass::Render( CommandBuffer& commandBuffer, Device& device, ImageHandle gbufferTexture, ImageHandle depthTexture, uint32_t channelIndex ) {
 		BeginRendering( commandBuffer, device );
 
-		VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
-
-		VkDescriptorSet texturePool = device.GetTexturePool();
-		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline );
-		vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &texturePool, 0, nullptr );
+		commandBuffer.SetScissorAndViewport( float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
+		commandBuffer.BindPipeline(m_Pipeline);
 
 		GBufferDebugPushConstants pc = {
 			.m_GBufferTexture = uint32_t( gbufferTexture ),
@@ -145,7 +112,9 @@ namespace Boundless {
 			.m_GBufferChannel = channelIndex
 		};
 
-		vkCmdPushConstants( commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( GBufferDebugPushConstants ), &pc );
+		commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
+
+		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
 		vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
 
 		EndRendering( commandBuffer, device );
@@ -168,34 +137,16 @@ namespace Boundless {
 		BaseRenderPass::CreatePassResources( device );
 
 		VkDevice deviceHandle = device.GetDevice();
-
-		m_PipelineLayout = PipelineLayoutBuilder()
-			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( LightingPushConstants ) } } )
-			.SetDescriptorSets( { device.GetTexturePoolLayout() } )
-			.Build( deviceHandle );
-
-		std::vector<VkFormat> rtFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
-
-		auto fullscreenRasterization = VkUtil::PipelineDefaultRasterizationState();
-		fullscreenRasterization.cullMode = VK_CULL_MODE_FRONT_BIT;
-		fullscreenRasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-		m_Pipeline = PipelineBuilder{}
+		m_Pipeline = m_PipelineBuilder
 			.SetShaderBlobs( { { g_EngineShaders.LightingPixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.FullscreenTriVertexShader, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetRasterizationState( fullscreenRasterization )
-			.SetColorAttachmentFormats( rtFormats )
-			.SetPipelineLayout( m_PipelineLayout )
 			.Build( deviceHandle );
 	}
 
-	void LightingPass::Render( VkCommandBuffer commandBuffer, Device& device, Scene& scene, ImageHandle gbufferTexture, ImageHandle depthTexture ) { 
+	void LightingPass::Render( CommandBuffer& commandBuffer, Device& device, Scene& scene, ImageHandle gbufferTexture, ImageHandle depthTexture ) { 
 		BeginRendering( commandBuffer, device );
 
-		VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
-
-		VkDescriptorSet texturePool = device.GetTexturePool();
-		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline );
-		vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &texturePool, 0, nullptr );
+		commandBuffer.SetScissorAndViewport( float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
+		commandBuffer.BindPipeline( m_Pipeline );
 
 		VkDeviceAddress sceneUniforms = device.GetBuffer( scene.GetUniformBuffer() ).GetDeviceAddress();
 
@@ -205,7 +156,9 @@ namespace Boundless {
 			.m_GBufferDepthTexture = uint32_t( depthTexture ),
 		};
 
-		vkCmdPushConstants( commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( LightingPushConstants ), &pc );
+		commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
+
+		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
 		vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
 
 		EndRendering( commandBuffer, device );
@@ -228,34 +181,16 @@ namespace Boundless {
 		BaseRenderPass::CreatePassResources(device);
 	
 		VkDevice deviceHandle = device.GetDevice();
-
-		m_PipelineLayout = PipelineLayoutBuilder()
-			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( CompositePushConstants ) } } )
-			.SetDescriptorSets( { device.GetTexturePoolLayout() } )
-			.Build( deviceHandle );
-
-		std::vector<VkFormat> rtFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
-
-		auto fullscreenRasterization = VkUtil::PipelineDefaultRasterizationState();
-		fullscreenRasterization.cullMode = VK_CULL_MODE_FRONT_BIT;
-		fullscreenRasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-		m_Pipeline = PipelineBuilder{}
+		m_Pipeline = m_PipelineBuilder
 			.SetShaderBlobs( { { g_EngineShaders.CompositePixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.FullscreenTriVertexShader, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetRasterizationState( fullscreenRasterization )
-			.SetColorAttachmentFormats( rtFormats )
-			.SetPipelineLayout( m_PipelineLayout )
 			.Build( deviceHandle );
 	}
 	
-	void CompositePass::Render( VkCommandBuffer commandBuffer, Device& device, ImageHandle texture ) { 
+	void CompositePass::Render( CommandBuffer& commandBuffer, Device& device, ImageHandle texture ) { 
 		BeginRendering( commandBuffer, device );
 
-		VkUtil::CommandBufferSetScissorAndViewport( commandBuffer, float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
-
-		VkDescriptorSet texturePool = device.GetTexturePool();
-		vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline );
-		vkCmdBindDescriptorSets( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1, &texturePool, 0, nullptr );
+		commandBuffer.SetScissorAndViewport( float( m_Viewport.Size.width ), float( m_Viewport.Size.height ), 0.f, 0.f, 0.f, 1.f, false );
+		commandBuffer.BindPipeline( m_Pipeline );
 
 		CompositePushConstants pc = {
 			.m_Texture = uint32_t( texture ),
@@ -263,7 +198,9 @@ namespace Boundless {
 			.m_ApplyTonemapping = 1,
 		};
 
-		vkCmdPushConstants( commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( CompositePushConstants ), &pc );
+		commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
+
+		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
 		vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
 
 		EndRendering( commandBuffer, device );

@@ -6,12 +6,12 @@ namespace Boundless {
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 
 		if ( !m_DescriptorSets.empty() ) {
-			pipelineLayoutCreateInfo.setLayoutCount = static_cast< uint32_t >( m_DescriptorSets.size() );
+			pipelineLayoutCreateInfo.setLayoutCount = uint32_t( m_DescriptorSets.size() );
 			pipelineLayoutCreateInfo.pSetLayouts = m_DescriptorSets.data();
 		}
 
 		if ( !m_PushConstants.empty() ) {
-			pipelineLayoutCreateInfo.pushConstantRangeCount = static_cast< uint32_t >( m_PushConstants.size() );
+			pipelineLayoutCreateInfo.pushConstantRangeCount = uint32_t( m_PushConstants.size() );
 			pipelineLayoutCreateInfo.pPushConstantRanges = m_PushConstants.data();
 		}
 
@@ -65,9 +65,9 @@ namespace Boundless {
 			vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
 			vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
 		} else {
-			vertexInputCreateInfo.vertexBindingDescriptionCount = static_cast< uint32_t >( m_InputBindingDescriptions.size() );
+			vertexInputCreateInfo.vertexBindingDescriptionCount = uint32_t( m_InputBindingDescriptions.size() );
 			vertexInputCreateInfo.pVertexBindingDescriptions = m_InputBindingDescriptions.data();
-			vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast< uint32_t >( m_InputAttributeDescriptions.size() );
+			vertexInputCreateInfo.vertexAttributeDescriptionCount = uint32_t( m_InputAttributeDescriptions.size() );
 			vertexInputCreateInfo.pVertexAttributeDescriptions = m_InputAttributeDescriptions.data();
 		}
 
@@ -77,19 +77,19 @@ namespace Boundless {
 		viewportStateCreateInfo.scissorCount = 1;
 
 		VkPipelineRenderingCreateInfo renderingPipelineCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-		renderingPipelineCreateInfo.colorAttachmentCount = static_cast< uint32_t >( m_ColorFormats.size() );
+		renderingPipelineCreateInfo.colorAttachmentCount = uint32_t( m_ColorFormats.size() );
 		renderingPipelineCreateInfo.pColorAttachmentFormats = m_ColorFormats.empty() ? nullptr : m_ColorFormats.data();
 		renderingPipelineCreateInfo.depthAttachmentFormat = m_DepthFormat;
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-		pipelineCreateInfo.stageCount = static_cast< uint32_t >( shaderStages.size() );
+		pipelineCreateInfo.stageCount = uint32_t( shaderStages.size() );
 		pipelineCreateInfo.pStages = shaderStages.data();
 
 		// Todo remove: This is bad.
 		m_ColorBlendState = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
 		m_ColorBlendState.logicOpEnable = VK_FALSE;
 		m_ColorBlendState.logicOp = VK_LOGIC_OP_COPY; // Optional
-		m_ColorBlendState.attachmentCount = static_cast< uint32_t >( m_ColorBlendAttachmentStates.size() );
+		m_ColorBlendState.attachmentCount = uint32_t( m_ColorBlendAttachmentStates.size() );
 		m_ColorBlendState.pAttachments = m_ColorBlendAttachmentStates.data();
 
 		pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;

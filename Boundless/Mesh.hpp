@@ -3,37 +3,30 @@
 #include "Image.hpp"
 #include "Buffer.hpp"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 namespace Boundless {
 	struct alignas( 16 ) MeshVertexData {
 		glm::vec3 m_Position{};
-		float m_UVx{};
+		float	  m_UVx{};
 		glm::vec3 m_Normal{};
-		float m_UVy{};
+		float	  m_UVy{};
 		glm::vec4 m_Tangent{};
 	};
 
 	struct Mesh {
-		std::string m_Name{};
-
-		std::vector<glm::vec3> m_Positions{};
-		std::vector<glm::vec3> m_Normals{};
-		std::vector<glm::vec2> m_Texcoords{};
-		std::vector<glm::vec4> m_Tangents{};
-
-		std::vector<uint32_t> m_Indices{};
-		std::vector<MeshVertexData> m_Vertices{};
-
-		uint32_t m_Material{}; 
-
-		BufferHandle m_IndexBuffer  = BufferHandle::Invalid;
-		BufferHandle m_VertexBuffer = BufferHandle::Invalid;
-		BufferHandle m_BlasBuffer   = BufferHandle::Invalid;
-		VkAccelerationStructureKHR m_Blas{};
-
 		void PackVertexData();
+	
+		std::string					m_Name;
+		std::vector<glm::vec3>		m_Positions;
+		std::vector<glm::vec3>		m_Normals;
+		std::vector<glm::vec2>		m_Texcoords;
+		std::vector<glm::vec4>		m_Tangents;
+		std::vector<uint32_t>		m_Indices;
+		std::vector<MeshVertexData> m_Vertices;
+		uint32_t					m_Material = 0; 
+		BufferHandle				m_IndexBuffer = BufferHandle::Invalid;
+		BufferHandle				m_VertexBuffer = BufferHandle::Invalid;
+		BufferHandle				m_BlasBuffer = BufferHandle::Invalid;
+		VkAccelerationStructureKHR	m_Blas = {};
 	};
 
 	enum class EAlphaMode : int32_t {
@@ -44,33 +37,30 @@ namespace Boundless {
 	};
 
 	struct alignas(16) GPUMaterial {
-		int m_Index{};
-		glm::vec3 m_Pad{};
-
-		float m_MetallicFactor				= 1.f;
-		float m_RoughnessFactor				= 1.f;
-		EAlphaMode m_AlphaMode				= EAlphaMode::Opaque;
-		float m_AlphaCutoff					= 0.5f;
-
-		ImageHandle m_AlbedoTexture			= ImageHandle::Invalid;
-		ImageHandle m_NormalsTexture		= ImageHandle::Invalid;
+		int			m_Index{};
+		glm::vec3	m_PadVec3{}; // TODO: Maybe use this space?
+		float		m_MetallicFactor = 1.f;
+		float		m_RoughnessFactor = 1.f;
+		EAlphaMode	m_AlphaMode = EAlphaMode::Opaque;
+		float		m_AlphaCutoff = 0.5f;
+		ImageHandle m_AlbedoTexture = ImageHandle::Invalid;
+		ImageHandle m_NormalsTexture = ImageHandle::Invalid;
 		ImageHandle m_MetalRoughnessTexture = ImageHandle::Invalid;
-		ImageHandle m_EmissiveTexture		= ImageHandle::Invalid;
-
-		glm::vec4 m_Albedo					= {1.f, 1.f, 1.f, 1.f};
-		glm::vec4 m_Emissive				= {0.f, 0.f, 0.f, 1.f};
+		ImageHandle m_EmissiveTexture = ImageHandle::Invalid;
+		glm::vec4	m_Albedo = {1.f, 1.f, 1.f, 1.f};
+		glm::vec4	m_Emissive = {0.f, 0.f, 0.f, 1.f};
 	};
 
 	struct Material : GPUMaterial {
-		std::string m_AlbedoTexturePath{};
-		std::string m_NormalsTexturePath{};
-		std::string m_MetalRoughnessTexturePath{};
-		std::string m_EmissiveTexturePath{};
+		std::string m_AlbedoTexturePath;
+		std::string m_NormalsTexturePath;
+		std::string m_MetalRoughnessTexturePath;
+		std::string m_EmissiveTexturePath;
 	};
 
 	struct AnimationSampler {
-		std::string m_Interpolation{};
-		std::vector<float> m_Inputs{};
+		std::string			   m_Interpolation{};
+		std::vector<float>	   m_Inputs{};
 		std::vector<glm::vec4> m_Outputs{};
 	};
 
@@ -83,18 +73,16 @@ namespace Boundless {
 
 	struct AnimationChannel {
 		EChannelType m_Type{};
-		// entt::entity m_Node{};
-		uint32_t m_Sampler{}; // Sampler Index.
+		uint32_t	 m_Sampler{};
 	};
 
 	struct Animation {
-		std::string m_Name{};
-		std::vector<AnimationSampler> m_Samplers{};
-		std::vector<AnimationChannel> m_Channels{};
-
-		float m_Start{ FLT_MAX }, m_End{ FLT_MIN };
-		float m_CurTime{};
-
-		bool m_IsPaused{};
+		std::string					  m_Name;
+		std::vector<AnimationSampler> m_Samplers;
+		std::vector<AnimationChannel> m_Channels;
+		float						  m_Start = FLT_MAX;
+		float						  m_End = FLT_MIN;
+		float						  m_CurTime;
+		bool						  m_IsPaused = false;
 	};
 }

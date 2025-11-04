@@ -1,16 +1,17 @@
 #pragma once
 #include "VkUtil.hpp"
 #include "Device.hpp"
+#include "Pipelines.hpp"
 
 namespace Boundless {
 	class BaseRenderPass {
 	public:
 		BaseRenderPass( const Viewport& viewport, const std::string& name ) : m_Viewport( viewport ), m_Name( name ) { }
-		
+
 		void DepthTarget( const Image::Desc& desc ) { m_DepthDesc = desc; }
 		void RenderTarget( const Image::Desc& desc ) { m_RenderTargetDescs.push_back(desc); }
 
-		void BeginRendering(VkCommandBuffer commandBuffer, Device& device) {
+		void BeginRendering(CommandBuffer& commandBuffer, Device& device) {
 			std::vector<VkRenderingAttachmentInfo> colorAttachments = {};
 			VkRenderingAttachmentInfo depthAttachment = {};
 
@@ -31,14 +32,14 @@ namespace Boundless {
 			VkRenderingAttachmentInfo* depthInfo = m_DepthTargetView == ImageHandle::Invalid ? nullptr : &depthAttachment;
 			VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_Viewport.Size, colorAttachments.data(), depthInfo, uint32_t(colorAttachments.size()) );
 
-			VkUtil::CommandBufferBeginRendering( commandBuffer, &renderingInfo );
+			commandBuffer.BeginRendering(&renderingInfo);
 		}
 
-		void EndRendering( VkCommandBuffer commandBuffer, [[maybe_unused]] Device& device ) {
-			VkUtil::CommandBufferEndRendering(commandBuffer);
+		void EndRendering( CommandBuffer& commandBuffer, [[maybe_unused]] Device& device ) {
+			commandBuffer.EndRendering();
 		}
 
-		void AddExitBarriers( VkCommandBuffer commandBuffer, Device& device ) {
+		void AddExitBarriers( CommandBuffer& commandBuffer, Device& device ) {
 			std::vector<Image::Desc> allDescs = m_RenderTargetDescs;
 			if( m_DepthDesc.m_Format != VK_FORMAT_UNDEFINED )
 				allDescs.push_back(m_DepthDesc);
@@ -59,24 +60,25 @@ namespace Boundless {
 				ImageHandle resource = isDepth ? m_DepthTarget : m_RenderTargets[i];
 				VkImage image = device.GetImage(resource);
 
-				VkUtil::CommandBufferImageBarrier(
-					commandBuffer, 
-					image, 
-					srcAccessMask, 
-					dstAccessMask, 
-					VK_IMAGE_LAYOUT_UNDEFINED, 
+				commandBuffer.ImageBarrier( 
+					image,
+					srcAccessMask,
+					dstAccessMask,
+					VK_IMAGE_LAYOUT_UNDEFINED,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					srcStageMask,
-					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 
+					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 					subresourceRange
 				);
-			}		
+			}
 		}
 
 		virtual void CreatePassResources( Device& device ) {
 			if ( m_DepthDesc.m_Format != VK_FORMAT_UNDEFINED ) {
 				m_DepthTarget = device.CreateImage( m_DepthDesc );
 				m_DepthTargetView = device.CreateImageView( m_DepthTarget );
+				
+				m_PipelineBuilder.SetDepthAttachmentFormat( m_DepthDesc.m_Format );
 			}
 
 			m_RenderTargets.resize( m_RenderTargetDescs.size() );
@@ -86,16 +88,44 @@ namespace Boundless {
 				m_RenderTargets[ i ] = device.CreateImage( m_RenderTargetDescs[ i ] );
 				m_RenderTargetViews[ i ] = device.CreateImageView( m_RenderTargets[ i ] );
 			}
+
+			std::vector<VkFormat> renderTargetFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
+
+			m_PipelineBuilder
+				.SetColorAttachmentFormats( renderTargetFormats )
+				.SetPipelineLayout( device.GetGlobalPipelineLayout() );
 		}
 
-		ImageHandle GetDepthBuffer() const { return m_DepthTarget; }
-		ImageHandle GetDepthBufferView() const { return m_DepthTargetView; }
+		virtual void ReleasePassResources( Device& device ) {
+			if ( m_DepthTargetView != ImageHandle::Invalid ) {
+				device.ReleaseImageView( m_DepthTargetView );
+			}
+
+			if ( m_DepthTarget != ImageHandle::Invalid ) {
+				device.ReleaseImage( m_DepthTarget );
+			}
+
+			for ( size_t i = 0; i < m_RenderTargetDescs.size(); i++ ) {
+				if ( m_RenderTargetViews[i] != ImageHandle::Invalid )
+					device.ReleaseImageView( m_RenderTargetViews[ i ] );
+				
+				if ( m_RenderTargets[ i ] != ImageHandle::Invalid )
+					device.ReleaseImage( m_RenderTargets[ i ] );
+			}
+		}
+
+		virtual ImageHandle GetDepthBuffer() const { return m_DepthTarget; }
+		virtual ImageHandle GetDepthBufferView() const { return m_DepthTargetView; }
+		virtual ImageHandle GetRenderTarget() const { return m_RenderTargets[ 0 ]; }
+		virtual ImageHandle GetRenderTargetView() const { return m_RenderTargetViews[ 0 ]; }
 	protected:
+		PipelineBuilder			 m_PipelineBuilder = {};
+		VkPipeline				 m_Pipeline;
 		std::vector<Image::Desc> m_RenderTargetDescs;
 		std::vector<ImageHandle> m_RenderTargetViews;
 		std::vector<ImageHandle> m_RenderTargets;
 		ImageHandle				 m_DepthTargetView = ImageHandle::Invalid;
-		ImageHandle				 m_DepthTarget	   = ImageHandle::Invalid;
+		ImageHandle				 m_DepthTarget = ImageHandle::Invalid;
 		Image::Desc				 m_DepthDesc;
 		Viewport				 m_Viewport;
 		std::string				 m_Name;

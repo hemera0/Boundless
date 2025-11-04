@@ -4,6 +4,7 @@
 #include "Engine.hpp"
 
 namespace Boundless {
+	// TODO: Redo all this.
 	Camera Camera::StationaryLookAtCamera( const glm::vec3& cameraPos, const glm::vec3& targetPos, const glm::vec3& worldUp, const float fov, const float aspect, const float nearZ ) {
 		Camera result = {};
 		result.m_ViewMatrix = glm::lookAt( cameraPos, targetPos, worldUp );

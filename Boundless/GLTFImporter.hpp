@@ -1,7 +1,6 @@
 #pragma once
+#include "Pch.hpp"
 #include "Scene.hpp"
-
-#include <tinygltf/tiny_gltf.h>
 
 namespace Boundless {
 	class GLTFImporter {
@@ -15,10 +14,9 @@ namespace Boundless {
 		void LoadAnimations( entt::entity entity, const tinygltf::Model& model );
 		void LoadNode( entt::entity parent, const tinygltf::Model& model, const tinygltf::Node& node );
 
-		Scene& m_Scene;
-		std::string m_BaseDir{};
-
-		std::vector<entt::entity> m_Animations{};
-		std::vector<entt::entity> m_Materials{};
+		Scene&					  m_Scene;
+		std::string				  m_BaseDir;
+		std::vector<entt::entity> m_Animations;
+		std::vector<entt::entity> m_Materials;
 	};
 }

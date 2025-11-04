@@ -1,25 +1,11 @@
 #pragma once
+#include "Pch.hpp"
 #include "Device.hpp"
-
-#include <entt/entt.hpp>
-
-#include "Mesh.hpp"
-#include "Camera.hpp"
+#include "Components.hpp"
 
 namespace Boundless {
-
-	// TODO: Move this back to Engine.hpp and call it FrameInfo/FrameConstants
-	struct SceneInfo {
-		glm::mat4 m_CameraViewProjectionMatrix{};
-		glm::mat4 m_CameraInvViewProjectionMatrix{};
-		glm::vec4 m_CameraPosition{};
-		glm::vec4 m_SunDirection{};
-		glm::vec4 m_SunColor{};
-		glm::ivec4 m_IblTextures{};
-	};
-
 	struct EntityRelation { 
-		entt::entity m_Parent = entt::null;
+		entt::entity			  m_Parent = entt::null;
 		std::vector<entt::entity> m_Children{};
 	};
 
@@ -29,24 +15,16 @@ namespace Boundless {
 
 		entt::registry& GetRegistry() { return m_Registry; }
 
+		// TODO: Remove.
 		Camera& GetMainCamera() { return m_MainCamera; }
 		void SetMainCamera( const Camera& camera ) { m_MainCamera = camera; }
 
-		void OnDeviceStart( const std::unique_ptr<Device>& device );
-
-		void UploadMeshes( const std::unique_ptr<Device>& device );
-		void UploadTLAS( const std::unique_ptr<Device>& device);
-		void BuildTLAS( const std::unique_ptr<Device>& device, VkCommandBuffer commandBuffer );
-
-		void UploadTextures( const std::unique_ptr<Device>& device );
-		void UploadMaterials( const std::unique_ptr<Device>& device );
-
-		void UpdateTransformsRecursive( entt::entity entity );
+		void OnDeviceStart( Device& device );
+		void BuildTLAS( Device& device, CommandBuffer& commandBuffer );
 		void UpdateTransforms();
 
 		BufferHandle GetUniformBuffer() const { return m_UniformBuffer; }
 		BufferHandle GetMaterialBuffer() const { return m_MaterialBuffer; }
-
 		VkAccelerationStructureKHR GetTLAS() const { return m_TLAS; }
 
 		// Entity relations
@@ -56,22 +34,20 @@ namespace Boundless {
 		entt::entity CreateGameObject( );
 		entt::entity GetRootEntity() const { return m_RootEntity; }
 	private:
-		Camera m_MainCamera{};
-		
-		entt::registry m_Registry{};
-		entt::entity m_RootEntity{};
+		void UploadTLAS( Device& device );
+		void UploadMeshes( Device& device );
+		void UploadTextures( Device& device );
+		void UploadMaterials( Device& device );
+		void UpdateTransformsRecursive( entt::entity entity );
 
-		// Rendering...
-		BufferHandle m_UniformBuffer  = BufferHandle::Invalid;
-		BufferHandle m_MaterialBuffer = BufferHandle::Invalid;
-
-		// RT...
-		// todo: EWWWWWWWWWW...
-		uint32_t m_TotalPrimitiveCount{};
-
-		VkAccelerationStructureKHR m_TLAS{};
-		BufferHandle m_TLASBuffer		 = BufferHandle::Invalid;
-		BufferHandle m_TLASScratchBuffer = BufferHandle::Invalid;
-		BufferHandle m_TLASInstances	 = BufferHandle::Invalid;
+		Camera					   m_MainCamera; // todo: Remove.
+		entt::registry			   m_Registry;
+		entt::entity			   m_RootEntity;
+		BufferHandle			   m_UniformBuffer = BufferHandle::Invalid; // todo: move to engine
+		BufferHandle			   m_MaterialBuffer = BufferHandle::Invalid;		
+		VkAccelerationStructureKHR m_TLAS = {};
+		BufferHandle			   m_TLASBuffer = BufferHandle::Invalid;
+		BufferHandle			   m_TLASScratchBuffer = BufferHandle::Invalid;
+		BufferHandle			   m_TLASInstances = BufferHandle::Invalid;
 	};
 }

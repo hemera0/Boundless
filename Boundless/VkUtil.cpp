@@ -50,7 +50,7 @@ namespace VkUtil {
 			extValidationFeatures.disabledValidationFeatureCount = 1;
 			extValidationFeatures.pDisabledValidationFeatures = &disableUniqueHandles;
 
-			instanceCreateInfo.enabledLayerCount = static_cast< uint32_t >( validationLayers.size() );
+			instanceCreateInfo.enabledLayerCount = uint32_t( validationLayers.size() );
 			instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 			instanceCreateInfo.pNext = &extValidationFeatures;
 		}
@@ -141,7 +141,7 @@ namespace VkUtil {
 		VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-		deviceCreateInfo.enabledExtensionCount = static_cast< uint32_t >( wantedExtensions.size() );
+		deviceCreateInfo.enabledExtensionCount = uint32_t( wantedExtensions.size() );
 		deviceCreateInfo.ppEnabledExtensionNames = wantedExtensions.data();
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -156,7 +156,7 @@ namespace VkUtil {
 			queueCreateInfos.push_back( queueCreateInfo );
 		}
 
-		deviceCreateInfo.queueCreateInfoCount = static_cast< uint32_t >( queueCreateInfos.size() );
+		deviceCreateInfo.queueCreateInfoCount = uint32_t( queueCreateInfos.size() );
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 
 		// Shouldn't matter as this should match the VkInstance layers
@@ -273,7 +273,7 @@ namespace VkUtil {
 			}
 		}
 
-		return static_cast< uint32_t >( wantedExtensions.size() ) == foundExts;
+		return uint32_t( wantedExtensions.size() ) == foundExts;
 	}
 
 	VkFormat PhysicalDeviceFindDepthFormat( const VkPhysicalDevice& physicalDevice ) {
@@ -471,8 +471,8 @@ namespace VkUtil {
 			GetClientRect( windowHandle, &area );
 
 			VkExtent2D actualExtent = {
-				static_cast< uint32_t >( area.right ),
-				static_cast< uint32_t >( area.bottom )
+				uint32_t( area.right ),
+				uint32_t( area.bottom )
 			};
 
 			actualExtent.width = std::clamp( actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width );
@@ -745,10 +745,6 @@ namespace VkUtil {
 		out.depthTestEnable = VK_TRUE;
 		out.depthWriteEnable = VK_TRUE;
 		out.depthCompareOp = VK_COMPARE_OP_LESS;
-		// out.depthBoundsTestEnable = VK_FALSE;
-		// out.minDepthBounds = 0.0f;
-		// out.maxDepthBounds = 1.0f;
-		// out.stencilTestEnable = VK_FALSE;
 		return out;
 	}
 
@@ -756,12 +752,12 @@ namespace VkUtil {
 		static std::vector<VkDynamicState> dynamicStates = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_SCISSOR,
-			//VK_DYNAMIC_STATE_CULL_MODE,
-			//VK_DYNAMIC_STATE_FRONT_FACE,
+			VK_DYNAMIC_STATE_CULL_MODE,
+			VK_DYNAMIC_STATE_FRONT_FACE
 		};
 
 		VkPipelineDynamicStateCreateInfo out{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-		out.dynamicStateCount = static_cast< uint32_t >( dynamicStates.size() );
+		out.dynamicStateCount = uint32_t( dynamicStates.size() );
 		out.pDynamicStates = dynamicStates.data();
 		return out;
 	}

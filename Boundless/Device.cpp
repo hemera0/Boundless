@@ -1,8 +1,10 @@
 #include "Pch.hpp"
 #include "Device.hpp"
+#include "Pipelines.hpp"
 
 // TODO: Swap for differnet format possibly.
 #include <ktxvulkan.h>
+#include "CommandBuffer.hpp"
 #pragma comment(lib, "ktx.lib")
 
 namespace Boundless {
@@ -62,9 +64,7 @@ namespace Boundless {
 	Device::~Device() { 
 		vkDeviceWaitIdle(m_Device);
 
-		ReleaseResources();
-
-		vkDestroyDescriptorSetLayout( m_Device, m_TexturePoolLayout, nullptr );
+		vkDestroyDescriptorSetLayout( m_Device, m_GlobalResourceLayout, nullptr );
 		vkDestroyDescriptorPool( m_Device, m_DescriptorPool, nullptr );
 		vkDestroyCommandPool( m_Device, m_CommandPool, nullptr );
 
@@ -81,7 +81,7 @@ namespace Boundless {
 		VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 		write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 		write.dstBinding = 0;
-		write.dstSet = m_TexturePool;
+		write.dstSet = m_GlobalResources;
 		write.descriptorCount = 1;
 		write.dstArrayElement = slotId;
 		write.pImageInfo = &imageInfo;
@@ -119,7 +119,7 @@ namespace Boundless {
 		}
 
 		VkWriteDescriptorSet samplerWrite = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-		samplerWrite.dstSet = m_TexturePool;
+		samplerWrite.dstSet = m_GlobalResources;
 		samplerWrite.dstBinding = 2;
 		samplerWrite.descriptorCount = SAMPLER_TYPE_MAX;
 		samplerWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -145,7 +145,7 @@ namespace Boundless {
 		descriptorSetLayoutCreateInfo.bindingCount = uint32_t( bindings.size() );
 		descriptorSetLayoutCreateInfo.pBindings = bindings.data();
 
-		vkCreateDescriptorSetLayout( m_Device, &descriptorSetLayoutCreateInfo, nullptr, &m_TexturePoolLayout );
+		vkCreateDescriptorSetLayout( m_Device, &descriptorSetLayoutCreateInfo, nullptr, &m_GlobalResourceLayout );
 
 		VkDescriptorPoolSize descriptorPoolSizes[ ] = {
 			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024 },
@@ -165,9 +165,14 @@ namespace Boundless {
 
 		VkDescriptorSetAllocateInfo setAllocateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 		setAllocateInfo.descriptorPool = m_DescriptorPool;
-		setAllocateInfo.pSetLayouts = &m_TexturePoolLayout;
+		setAllocateInfo.pSetLayouts = &m_GlobalResourceLayout;
 		setAllocateInfo.descriptorSetCount = 1;
-		vkAllocateDescriptorSets( m_Device, &setAllocateInfo, &m_TexturePool );
+		vkAllocateDescriptorSets( m_Device, &setAllocateInfo, &m_GlobalResources );
+
+		m_GlobalPipelineLayout = PipelineLayoutBuilder()
+			.SetPushConstants( { VkPushConstantRange{ VK_SHADER_STAGE_ALL, 0, 128u } } )
+			.SetDescriptorSets( { m_GlobalResourceLayout } )
+			.Build( m_Device );
 	}
 
 	ImageHandle Device::CreateImage( const Image::Desc& imageDesc ) {
@@ -248,20 +253,8 @@ namespace Boundless {
 
 	BufferHandle Device::CreateBuffer( const Buffer::Desc& bufferDesc ) {
 		size_t newId = m_AllBuffers.size();
-
 		m_AllBuffers.emplace_back( m_Device, m_Allocator, bufferDesc );
-
-		return static_cast< BufferHandle >( newId );
-	}
-
-	void Device::ReleaseResources() { 
-		// Bugged.
-		for ( Image& image : m_AllImages ) {
-			vmaDestroyImage( m_Allocator, image.m_Image, image.m_Allocation );
-		}
-
-		m_AllImages.clear();
-		m_AllBuffers.clear();
+		return BufferHandle( newId );
 	}
 
 	std::unique_ptr<StagingBuffer> Device::CreateStagingBuffer( const VkDeviceSize size ) {
@@ -269,7 +262,7 @@ namespace Boundless {
 	}
 
 	void Device::TransitionImageLayout( const VkImage& image, uint32_t levels, const VkFormat format, const VkImageLayout oldLayout, const VkImageLayout newLayout ) {
-		VkCommandBuffer commandBuffer = CreateCommandBuffer();
+		CommandBuffer commandBuffer = CommandBuffer(*this);
 
 		VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
@@ -309,11 +302,12 @@ namespace Boundless {
 		VkUtil::CommandBufferEnd( commandBuffer );
 		VkUtil::CommandBufferSubmit( commandBuffer, m_GraphicsQueue );
 
-		vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &commandBuffer );
+		VkCommandBuffer handle = commandBuffer;
+		vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &handle );
 	}
 
 	void Device::GenerateMipmaps( const VkImage& image, uint32_t width, uint32_t height, uint32_t mipLevels ) {
-		VkCommandBuffer commandBuffer = CreateCommandBuffer( );
+		CommandBuffer commandBuffer = CommandBuffer( *this );
 
 		VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
@@ -379,10 +373,11 @@ namespace Boundless {
 		vkCmdPipelineBarrier( commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			0, 0, nullptr, 0, nullptr, 1, &imageBarrier );
 
-		VkUtil::CommandBufferEnd( commandBuffer );
-		VkUtil::CommandBufferSubmit( commandBuffer, m_GraphicsQueue );
+		commandBuffer.End();
+		commandBuffer.Submit( m_GraphicsQueue );
 
-		vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &commandBuffer );
+		VkCommandBuffer handle = commandBuffer;
+		vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &handle );
 	}
 
 	std::pair<ImageHandle, ImageHandle> Device::LoadImageFromFile( const std::string& path, bool isSRGB ) {
@@ -392,13 +387,13 @@ namespace Boundless {
 			return {};
 		}
 
-		uint32_t mipLevels = static_cast< uint32_t >( std::floor( std::log2( std::max( width, height ) ) ) ) + 1;
+		uint32_t mipLevels = uint32_t( std::floor( std::log2( std::max( width, height ) ) ) ) + 1;
 
 		VkDeviceSize imageSize = width * height * 4; // This is kinda ghetto.
 		std::unique_ptr<StagingBuffer> stagingBuffer = std::make_unique<StagingBuffer>( m_Device, m_Allocator, imageSize );
 
 		void* data = stagingBuffer->Map();
-		memcpy( data, pixels, static_cast< size_t >( imageSize ) );
+		memcpy( data, pixels, size_t( imageSize ) );
 		stagingBuffer->Unmap();
 
 		stbi_image_free( pixels );
@@ -423,14 +418,15 @@ namespace Boundless {
 		TransitionImageLayout( image.m_Image, mipLevels, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
 
 		{
-			VkCommandBuffer commandBuffer = CreateCommandBuffer( );
+			CommandBuffer commandBuffer = CommandBuffer( *this );
 
 			VkUtil::CommandBufferBegin( commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 			VkUtil::CommandBufferCopyBufferToImage( commandBuffer, *stagingBuffer, image.m_Image, width, height );
 			VkUtil::CommandBufferEnd( commandBuffer );
 			VkUtil::CommandBufferSubmit( commandBuffer, m_GraphicsQueue );
 
-			vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &commandBuffer );
+			VkCommandBuffer handle = commandBuffer;
+			vkFreeCommandBuffers( m_Device, m_CommandPool, 1, &handle );
 		}
 
 		GenerateMipmaps( image.m_Image, width, height, mipLevels );
@@ -487,10 +483,6 @@ namespace Boundless {
 		return { viewHandle, imageHandle };
 	}
 
-	VkCommandBuffer Device::CreateCommandBuffer() {
-		return VkUtil::CreateCommandBuffer( m_Device, m_CommandPool );
-	}
-
 	VkSampler Device::CreateSampler( const SamplerDesc& samplerDesc ) {
 		VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 		samplerInfo.flags = 0;
@@ -513,5 +505,20 @@ namespace Boundless {
 		vkCreateSampler( m_Device, &samplerInfo, nullptr, &sampler );
 
 		return sampler;
+	}
+
+	void Device::ReleaseImage( ImageHandle handle ) { 
+		vkDeviceWaitIdle(m_Device);
+		
+		// TODO: free index.
+		Image& image = m_AllImages[ size_t( handle ) ];
+		vmaDestroyImage(m_Allocator, image.m_Image, image.m_Allocation);
+	}
+	
+	void Device::ReleaseImageView( ImageHandle handle ) { 
+		vkDeviceWaitIdle( m_Device );
+
+		Image& image = m_AllImages[ size_t( handle ) ];
+		vkDestroyImageView(m_Device, image.m_ImageView, nullptr);
 	}
 }

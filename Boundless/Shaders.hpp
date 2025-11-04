@@ -17,8 +17,8 @@ namespace Boundless {
 
 		IDxcBlob* CompileShader( const std::wstring& shaderPath, ShaderType shaderType );
 	private:
-		Microsoft::WRL::ComPtr<IDxcLibrary> m_Library = nullptr;
+		Microsoft::WRL::ComPtr<IDxcLibrary>	  m_Library = nullptr;
 		Microsoft::WRL::ComPtr<IDxcCompiler3> m_Compiler = nullptr;
-		Microsoft::WRL::ComPtr<IDxcUtils> m_Utils = nullptr;
+		Microsoft::WRL::ComPtr<IDxcUtils>	  m_Utils = nullptr;
 	};
 }

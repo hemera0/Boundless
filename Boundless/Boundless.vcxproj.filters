@@ -37,6 +37,9 @@
     <Filter Include="Source Files\Vulkan\RenderPasses">
       <UniqueIdentifier>{48aa3419-4449-4a2f-897d-fbfc8072b924}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Components">
+      <UniqueIdentifier>{08f2d6f4-cf93-4d54-8ed0-30330284990a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -84,6 +87,9 @@
     <ClCompile Include="RenderPasses.cpp">
       <Filter>Source Files\Vulkan\RenderPasses</Filter>
     </ClCompile>
+    <ClCompile Include="CommandBuffer.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.hpp">
@@ -104,9 +110,6 @@
     <ClInclude Include="VkUtil.hpp">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="Mesh.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Scene.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -115,12 +118,6 @@
     </ClInclude>
     <ClInclude Include="GLTFImporter.hpp">
       <Filter>Header Files\Importers</Filter>
-    </ClInclude>
-    <ClInclude Include="Camera.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Transform.hpp">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Pch.hpp">
       <Filter>Header Files</Filter>
@@ -136,6 +133,21 @@
     </ClInclude>
     <ClInclude Include="RenderPasses.hpp">
       <Filter>Header Files\Vulkan\RenderPasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.hpp">
+      <Filter>Header Files\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Transform.hpp">
+      <Filter>Header Files\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.hpp">
+      <Filter>Header Files\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Components.hpp">
+      <Filter>Header Files\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandBuffer.hpp">
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

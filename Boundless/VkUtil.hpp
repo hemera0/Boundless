@@ -16,8 +16,8 @@ struct Viewport {
 namespace VkUtil {
 	struct QueueFamilyIndices_t {
 		uint32_t m_GraphicsFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t m_PresentFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t m_ComputeFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		uint32_t m_PresentFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+		uint32_t m_ComputeFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
 
 		bool IsValid() const {
 			return m_GraphicsFamilyIndex != VK_QUEUE_FAMILY_IGNORED &&
@@ -27,9 +27,9 @@ namespace VkUtil {
 	};
 
 	struct SwaphchainSupportData_t {
-		VkSurfaceCapabilitiesKHR m_SurfaceCapabilities{};
-		std::vector<VkSurfaceFormatKHR> m_SurfaceFormats{};
-		std::vector<VkPresentModeKHR> m_PresentModes{};
+		VkSurfaceCapabilitiesKHR		m_SurfaceCapabilities = {};
+		std::vector<VkSurfaceFormatKHR> m_SurfaceFormats;
+		std::vector<VkPresentModeKHR>	m_PresentModes;
 	};
 
 	VkInstance CreateInstance( const char** requiredExtensions, const int requiredExtensionsCount );
