@@ -2,7 +2,7 @@
 #include "Buffer.hpp"
 
 namespace Boundless {
-    Buffer::Buffer( const VkDevice& device, const VmaAllocator& allocator, const Buffer::Desc& bufferDesc) : m_Device( device ), m_Allocator( allocator ), m_Size( bufferDesc.m_Size ) {
+    Buffer::Buffer( const vk::Device& device, const VmaAllocator& allocator, const Buffer::Desc& bufferDesc) : m_Device( device ), m_Allocator( allocator ), m_Size( bufferDesc.m_Size ) {
         VmaAllocationCreateInfo allocCreateInfo = {};
         allocCreateInfo.usage = bufferDesc.m_MemoryUsage;
         allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
@@ -11,10 +11,13 @@ namespace Boundless {
             allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
         VkBufferCreateInfo bufferInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-        bufferInfo.size = bufferDesc.m_Size;
-        bufferInfo.usage = bufferDesc.m_Usage;
+        bufferInfo.size = VkDeviceSize( bufferDesc.m_Size );
+        bufferInfo.usage = VkBufferUsageFlags( bufferDesc.m_Usage );
 
-        vmaCreateBuffer( allocator, &bufferInfo, &allocCreateInfo, &m_Handle, &m_Allocation, nullptr );
+        VkBuffer handle = VK_NULL_HANDLE;
+        vmaCreateBuffer( allocator, &bufferInfo, &allocCreateInfo, &handle, &m_Allocation, nullptr );
+        
+        m_Handle = vk::Buffer(handle);
     }
 
     void Buffer::Release() { 
@@ -38,9 +41,7 @@ namespace Boundless {
         Unmap();
     }
 
-    VkDeviceAddress Buffer::GetDeviceAddress() const {
-        VkBufferDeviceAddressInfo deviceAddrInfo{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
-        deviceAddrInfo.buffer = GetHandle();
-        return vkGetBufferDeviceAddress(m_Device, &deviceAddrInfo);
+    vk::DeviceAddress Buffer::GetDeviceAddress() const {
+        return m_Device.getBufferAddress( vk::BufferDeviceAddressInfo{ m_Handle } );
     }
 }

@@ -1,28 +1,14 @@
 #include "Pch.hpp"
 #include "Pipelines.hpp"
+#include "Device.hpp"
 
 namespace Boundless {
-	VkPipelineLayout PipelineLayoutBuilder::Build( const VkDevice& device ) {
-		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-
-		if ( !m_DescriptorSets.empty() ) {
-			pipelineLayoutCreateInfo.setLayoutCount = uint32_t( m_DescriptorSets.size() );
-			pipelineLayoutCreateInfo.pSetLayouts = m_DescriptorSets.data();
-		}
-
-		if ( !m_PushConstants.empty() ) {
-			pipelineLayoutCreateInfo.pushConstantRangeCount = uint32_t( m_PushConstants.size() );
-			pipelineLayoutCreateInfo.pPushConstantRanges = m_PushConstants.data();
-		}
-
-		VkPipelineLayout ret = VK_NULL_HANDLE;
-		VkResult result = vkCreatePipelineLayout( device, &pipelineLayoutCreateInfo, nullptr, &ret );
-		if ( result != VK_SUCCESS ) {
-			printf( "Failed to create pipleline layout: %d\n", result );
-			return VK_NULL_HANDLE;
-		}
-
-		return ret;
+	vk::PipelineLayout PipelineLayoutBuilder::Build( Device& device ) {
+		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+		pipelineLayoutCreateInfo.setSetLayouts( m_DescriptorSets );
+		pipelineLayoutCreateInfo.setPushConstantRanges( m_PushConstants );
+	
+		return device->createPipelineLayout( pipelineLayoutCreateInfo );
 	}
 
 	PipelineBuilder::PipelineBuilder() {
@@ -34,9 +20,33 @@ namespace Boundless {
 		m_ColorBlendAttachmentStates = { VkUtil::PipelineDefaultColorBlendAttachmentState() };
 	}
 
-	VkPipeline PipelineBuilder::Build( const VkDevice& device ) {
-		std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
-		std::vector<VkShaderModuleCreateInfo> shaderModules{};
+	vk::Pipeline ComputePipelineBuilder::Build( Device& device ) {
+		const auto& [ blob, stage ] = m_ShaderBlob;
+
+		vk::ShaderModuleCreateInfo shaderModule = {};
+		shaderModule.codeSize = blob->GetBufferSize();
+		shaderModule.pCode = reinterpret_cast< const uint32_t* >( blob->GetBufferPointer() );
+
+		vk::PipelineShaderStageCreateInfo shaderStage = {};
+		shaderStage.stage = stage;
+		shaderStage.pName = "main";
+		shaderStage.pNext = &shaderModule;
+
+		vk::ComputePipelineCreateInfo pipelineCreateInfo = {};
+		pipelineCreateInfo.setStage( shaderStage )
+			.setLayout( m_PipelineLayout );
+		
+		const auto& [ result, value ] = device->createComputePipeline( nullptr, pipelineCreateInfo );
+		if ( result != vk::Result::eSuccess ) {
+			return VK_NULL_HANDLE;
+		}
+
+		return value;
+	}
+
+	vk::Pipeline PipelineBuilder::Build( Device& device ) {
+		std::vector<vk::PipelineShaderStageCreateInfo> shaderStages{};
+		std::vector<vk::ShaderModuleCreateInfo> shaderModules{};
 
 		shaderStages.resize( m_ShaderBlobs.size() );
 		shaderModules.resize( m_ShaderBlobs.size() );
@@ -46,75 +56,51 @@ namespace Boundless {
 			const auto& [blob, shaderStage] = m_ShaderBlobs[ i ];
 
 			auto& module = shaderModules[ i ];
-			module.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			// module.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 			module.codeSize = blob->GetBufferSize();
 			module.pCode = reinterpret_cast< const uint32_t* >( blob->GetBufferPointer() );
 
 			auto& stage = shaderStages[ i ];
-			stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			// stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			stage.stage = shaderStage; // TODO: FIX ME.... shader->GetStageFlags();
 			stage.pName = "main";
 			stage.pNext = &module;
 		}
 
-		VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+		vk::PipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
+		vertexInputCreateInfo.setVertexAttributeDescriptions( m_InputAttributeDescriptions );
+		vertexInputCreateInfo.setVertexBindingDescriptions( m_InputBindingDescriptions );
 
-		if ( m_InputBindingDescriptions.empty() && m_InputAttributeDescriptions.empty() ) {
-			vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
-			vertexInputCreateInfo.pVertexBindingDescriptions = nullptr;
-			vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
-			vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr;
-		} else {
-			vertexInputCreateInfo.vertexBindingDescriptionCount = uint32_t( m_InputBindingDescriptions.size() );
-			vertexInputCreateInfo.pVertexBindingDescriptions = m_InputBindingDescriptions.data();
-			vertexInputCreateInfo.vertexAttributeDescriptionCount = uint32_t( m_InputAttributeDescriptions.size() );
-			vertexInputCreateInfo.pVertexAttributeDescriptions = m_InputAttributeDescriptions.data();
-		}
-
-		VkPipelineViewportStateCreateInfo viewportStateCreateInfo{};
-		viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		vk::PipelineViewportStateCreateInfo viewportStateCreateInfo = {};
 		viewportStateCreateInfo.viewportCount = 1;
 		viewportStateCreateInfo.scissorCount = 1;
 
-		VkPipelineRenderingCreateInfo renderingPipelineCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-		renderingPipelineCreateInfo.colorAttachmentCount = uint32_t( m_ColorFormats.size() );
-		renderingPipelineCreateInfo.pColorAttachmentFormats = m_ColorFormats.empty() ? nullptr : m_ColorFormats.data();
-		renderingPipelineCreateInfo.depthAttachmentFormat = m_DepthFormat;
-
-		VkGraphicsPipelineCreateInfo pipelineCreateInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-		pipelineCreateInfo.stageCount = uint32_t( shaderStages.size() );
-		pipelineCreateInfo.pStages = shaderStages.data();
+		vk::PipelineRenderingCreateInfo renderingPipelineCreateInfo = {};
+		renderingPipelineCreateInfo.setColorAttachmentFormats( m_ColorFormats );
+		renderingPipelineCreateInfo.setDepthAttachmentFormat( m_DepthFormat );
 
 		// Todo remove: This is bad.
-		m_ColorBlendState = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-		m_ColorBlendState.logicOpEnable = VK_FALSE;
-		m_ColorBlendState.logicOp = VK_LOGIC_OP_COPY; // Optional
-		m_ColorBlendState.attachmentCount = uint32_t( m_ColorBlendAttachmentStates.size() );
-		m_ColorBlendState.pAttachments = m_ColorBlendAttachmentStates.data();
+		m_ColorBlendState = vk::PipelineColorBlendStateCreateInfo{};
+		m_ColorBlendState.setAttachments( m_ColorBlendAttachmentStates );
 
-		pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
-		pipelineCreateInfo.pInputAssemblyState = &m_InputAssemblyState;
-		pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-		pipelineCreateInfo.pRasterizationState = &m_RasterizationState;
-		pipelineCreateInfo.pMultisampleState = &m_MultisampleState;
-		pipelineCreateInfo.pDepthStencilState = &m_DepthStencilState;
-		pipelineCreateInfo.pColorBlendState = &m_ColorBlendState;
-		pipelineCreateInfo.pDynamicState = &m_DynamicState;
-		pipelineCreateInfo.layout = m_PipelineLayout;
-		pipelineCreateInfo.renderPass = VK_NULL_HANDLE; // Replaced by Dynamic Rendering.
-		pipelineCreateInfo.subpass = 0;
-		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-		pipelineCreateInfo.basePipelineIndex = -1; // Optional
-		pipelineCreateInfo.pNext = &renderingPipelineCreateInfo;
+		vk::GraphicsPipelineCreateInfo pipelineCreateInfo = {};
+		pipelineCreateInfo.setStages( shaderStages )
+			.setPVertexInputState( &vertexInputCreateInfo )
+			.setPInputAssemblyState( &m_InputAssemblyState )
+			.setPViewportState( &viewportStateCreateInfo )
+			.setPRasterizationState( &m_RasterizationState )
+			.setPMultisampleState( &m_MultisampleState )
+			.setPDepthStencilState( &m_DepthStencilState )
+			.setPColorBlendState( &m_ColorBlendState )
+			.setPDynamicState( &m_DynamicState )
+			.setLayout( m_PipelineLayout )
+			.setPNext( &renderingPipelineCreateInfo );
 
-		VkPipeline ret = VK_NULL_HANDLE;
-		VkResult result = vkCreateGraphicsPipelines( device, nullptr, 1, &pipelineCreateInfo, nullptr, &ret );
-
-		if ( result != VK_SUCCESS ) {
-			printf( "Failed to create pipeline: %d\n", result );
+		const auto& [ result, value ] = device->createGraphicsPipeline( nullptr, pipelineCreateInfo );
+		if ( result != vk::Result::eSuccess ) {
 			return VK_NULL_HANDLE;
 		}
 
-		return ret;
+		return value;
 	}
 }

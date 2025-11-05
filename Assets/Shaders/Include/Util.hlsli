@@ -1,3 +1,6 @@
+#ifndef _UTIL_HLSLI_
+#define _UTIL_HLSLI_
+
 #define M_PI 3.14159265359
 
 float3 ReconstructWorldPosition(float2 uv, float depth, float4x4 invViewProj) {
@@ -83,3 +86,4 @@ float3 ApplyACES(float3 x) {
     const float e = 0.14;
     return saturate((x * (a * x + b)) / (x * (c * x + d ) + e));
 }
+#endif

@@ -129,8 +129,7 @@ namespace Boundless {
 	private:
 		std::unordered_map<int, int> m_KeyStates{};
 		std::unordered_map<int, int> m_OldKeyStates{};
-
-		glm::vec2 m_MousePos{};
+		glm::vec2					 m_MousePos{};
 	};
 	
 	extern std::unique_ptr<Input> g_Input;

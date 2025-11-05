@@ -12,27 +12,27 @@ namespace Boundless {
 		void RenderTarget( const Image::Desc& desc ) { m_RenderTargetDescs.push_back(desc); }
 
 		void BeginRendering(CommandBuffer& commandBuffer, Device& device) {
-			std::vector<VkRenderingAttachmentInfo> colorAttachments = {};
-			VkRenderingAttachmentInfo depthAttachment = {};
+			std::vector<vk::RenderingAttachmentInfo> colorAttachments = {};
+			vk::RenderingAttachmentInfo depthAttachment = {};
 
 			if( m_DepthTargetView != ImageHandle::Invalid ) {
-				VkImageView depthView = device.GetImage( m_DepthTargetView );
-				depthAttachment = VkUtil::RenderPassGetDepthAttachmentInfo( depthView, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
+				const vk::ImageView& depthView = device.GetImage( m_DepthTargetView );
+				depthAttachment = VkUtil::RenderPassGetDepthAttachmentInfo( depthView, vk::ImageLayout::eAttachmentOptimal );
 			}
 			
 			colorAttachments.resize( m_RenderTargets.size() );
 
 			for(size_t i = 0; i < colorAttachments.size(); i++ ) {
-				VkImageView colorView = device.GetImage( m_RenderTargetViews[i] );
+				const vk::ImageView& colorView = device.GetImage( m_RenderTargetViews[i] );
 				
-				VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-				colorAttachments[i] = VkUtil::RenderPassGetColorAttachmentInfo( colorView, &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
+				vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
+				colorAttachments[i] = VkUtil::RenderPassGetColorAttachmentInfo( colorView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
 			}
 
-			VkRenderingAttachmentInfo* depthInfo = m_DepthTargetView == ImageHandle::Invalid ? nullptr : &depthAttachment;
-			VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_Viewport.Size, colorAttachments.data(), depthInfo, uint32_t(colorAttachments.size()) );
+			vk::RenderingAttachmentInfo* depthInfo = m_DepthTargetView == ImageHandle::Invalid ? nullptr : &depthAttachment;
+			vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_Viewport.Size, colorAttachments.data(), depthInfo, uint32_t( colorAttachments.size() ) );
 
-			commandBuffer.BeginRendering(&renderingInfo);
+			commandBuffer.BeginRendering(renderingInfo);
 		}
 
 		void EndRendering( CommandBuffer& commandBuffer, [[maybe_unused]] Device& device ) {
@@ -41,40 +41,41 @@ namespace Boundless {
 
 		void AddExitBarriers( CommandBuffer& commandBuffer, Device& device ) {
 			std::vector<Image::Desc> allDescs = m_RenderTargetDescs;
-			if( m_DepthDesc.m_Format != VK_FORMAT_UNDEFINED )
+			if( m_DepthDesc.m_Format != vk::Format::eUndefined )
 				allDescs.push_back(m_DepthDesc);
 
 			for(size_t i = 0; i < allDescs.size(); i++ ) {
 				const Image::Desc& desc = allDescs[i];
-				if( !( desc.m_Usage & VK_IMAGE_USAGE_SAMPLED_BIT ) ) // If we don't plan to sample the image ignore this barrier.
+				if( !( desc.m_Usage & vk::ImageUsageFlagBits::eSampled ) ) // If we don't plan to sample the image ignore this barrier.
 					continue;
 
-				bool isDepth = desc.m_Usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+				bool isDepth = ( desc.m_Usage & vk::ImageUsageFlagBits::eDepthStencilAttachment ) == vk::ImageUsageFlagBits::eDepthStencilAttachment;
 
-				VkAccessFlags srcAccessMask = isDepth ? ( VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT ) : ( VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT );
-				VkAccessFlags dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				vk::AccessFlags srcAccessMask = isDepth ? ( vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite ) : ( vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite );
+				vk::AccessFlags dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
-				VkPipelineStageFlags srcStageMask = isDepth ? ( VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT ) : ( VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT );
-				VkImageSubresourceRange subresourceRange = isDepth ? VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 } : VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+				vk::PipelineStageFlags srcStageMask = isDepth ? ( vk::PipelineStageFlagBits::eLateFragmentTests ) : ( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+				vk::ImageSubresourceRange subresourceRange = isDepth ? vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eDepth, 0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers } : 
+					vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers };
 			
 				ImageHandle resource = isDepth ? m_DepthTarget : m_RenderTargets[i];
-				VkImage image = device.GetImage(resource);
+				const vk::Image& image = device.GetImage(resource);
 
 				commandBuffer.ImageBarrier( 
 					image,
 					srcAccessMask,
 					dstAccessMask,
-					VK_IMAGE_LAYOUT_UNDEFINED,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					vk::ImageLayout::eUndefined,
+					vk::ImageLayout::eShaderReadOnlyOptimal,
 					srcStageMask,
-					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					vk::PipelineStageFlagBits::eFragmentShader,
 					subresourceRange
 				);
 			}
 		}
 
 		virtual void CreatePassResources( Device& device ) {
-			if ( m_DepthDesc.m_Format != VK_FORMAT_UNDEFINED ) {
+			if ( m_DepthDesc.m_Format != vk::Format::eUndefined ) {
 				m_DepthTarget = device.CreateImage( m_DepthDesc );
 				m_DepthTargetView = device.CreateImageView( m_DepthTarget );
 				
@@ -89,7 +90,7 @@ namespace Boundless {
 				m_RenderTargetViews[ i ] = device.CreateImageView( m_RenderTargets[ i ] );
 			}
 
-			std::vector<VkFormat> renderTargetFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
+			std::vector<vk::Format> renderTargetFormats = m_RenderTargetDescs | std::views::transform( &Image::Desc::m_Format ) | std::ranges::to<std::vector>();
 
 			m_PipelineBuilder
 				.SetColorAttachmentFormats( renderTargetFormats )
@@ -119,8 +120,9 @@ namespace Boundless {
 		virtual ImageHandle GetRenderTarget() const { return m_RenderTargets[ 0 ]; }
 		virtual ImageHandle GetRenderTargetView() const { return m_RenderTargetViews[ 0 ]; }
 	protected:
+		ComputePipelineBuilder	 m_ComputePipelineBuilder = {};
 		PipelineBuilder			 m_PipelineBuilder = {};
-		VkPipeline				 m_Pipeline;
+		vk::Pipeline			 m_Pipeline;
 		std::vector<Image::Desc> m_RenderTargetDescs;
 		std::vector<ImageHandle> m_RenderTargetViews;
 		std::vector<ImageHandle> m_RenderTargets;

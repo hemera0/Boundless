@@ -1,3 +1,5 @@
+#ifndef _TYPES_HLSLI_
+#define _TYPES_HLSLI_
 #include "Bindless.hlsli"
 #include "Material.hlsli"
 
@@ -51,3 +53,4 @@ struct CompositePushConstants {
 struct BlitPushConstants {
     int Texture;
 };
+#endif

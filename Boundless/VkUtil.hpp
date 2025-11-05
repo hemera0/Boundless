@@ -9,85 +9,51 @@ using ImageHandle = ResourceHandle;
 
 // Temp. idk im tired where put
 struct Viewport {
-	VkOffset2D Offset;
-	VkExtent2D Size;
+	vk::Offset2D Offset;
+	vk::Extent2D Size;
 };
 
 namespace VkUtil {
-	struct QueueFamilyIndices_t {
-		uint32_t m_GraphicsFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t m_PresentFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-		uint32_t m_ComputeFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-
-		bool IsValid() const {
-			return m_GraphicsFamilyIndex != VK_QUEUE_FAMILY_IGNORED &&
-				m_ComputeFamilyIndex != VK_QUEUE_FAMILY_IGNORED &&
-				m_PresentFamilyIndex != VK_QUEUE_FAMILY_IGNORED;
-		}
+	struct SwapchainSupportData {
+		vk::SurfaceCapabilitiesKHR		  m_SurfaceCapabilities = {};
+		std::vector<vk::SurfaceFormatKHR> m_SurfaceFormats;
+		std::vector<vk::PresentModeKHR>	  m_PresentModes;
 	};
 
-	struct SwaphchainSupportData_t {
-		VkSurfaceCapabilitiesKHR		m_SurfaceCapabilities = {};
-		std::vector<VkSurfaceFormatKHR> m_SurfaceFormats;
-		std::vector<VkPresentModeKHR>	m_PresentModes;
-	};
+	vk::Instance CreateInstance( const char** requiredExtensions, const int requiredExtensionsCount );
+	vk::PhysicalDevice GetPhysicalDevice( const vk::Instance& instance, const std::vector<const char*>& wantedExtensions );
+	vk::Device CreateLogicalDevice( const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const std::vector<const char*>& wantedExtensions );
 
-	VkInstance CreateInstance( const char** requiredExtensions, const int requiredExtensionsCount );
-	VkPhysicalDevice GetPhysicalDevice( const VkInstance& instance, const std::vector<const char*>& wantedExtensions );
-	VkDevice CreateLogicalDevice( const VkInstance& instance, const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface, const std::vector<const char*>& wantedExtensions );
-
-	VkSurfaceKHR CreateSurfaceForWindow( const VkInstance& instance, const HWND& hwnd );
+	vk::SurfaceKHR CreateSurfaceForWindow( const vk::Instance& instance, const HWND& hwnd );
 
 	// Physical Device Helpers...
-	bool PhysicalDeviceIsDiscreteGPU( const VkPhysicalDevice& physicalDevice );
-	bool PhysicalDeviceHasExtensions( const VkPhysicalDevice& physicalDevice, const std::vector<const char*>& wantedExtensions );
-	VkFormat PhysicalDeviceFindDepthFormat(const VkPhysicalDevice& physicalDevice );
+	bool PhysicalDeviceHasExtensions( const vk::PhysicalDevice& physicalDevice, const std::vector<const char*>& wantedExtensions );
+	vk::Format PhysicalDeviceFindDepthFormat(const vk::PhysicalDevice& physicalDevice );
 
 	// Surface & Physical Device Helpers...
-	QueueFamilyIndices_t FindQueueFamilyIndices( const VkSurfaceKHR& surface, const VkPhysicalDevice& physicalDevice );
-	SwaphchainSupportData_t QuerySwapchainSupport( const VkSurfaceKHR& surface, const VkPhysicalDevice& physicalDevice );
-
-	// Device Helpers...
-	VkQueue DeviceGetQueueByIndex( const VkDevice& device, uint32_t queueIndex );
-	VkCommandPool CreateCommandPool( const VkDevice& device, const VkCommandPoolCreateInfo& createInfo );
-	VkCommandBuffer CreateCommandBuffer( const VkDevice& device, const VkCommandPool& commandPool );
+	uint32_t FindQueueFamilyIndex( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice );
+	SwapchainSupportData QuerySwapchainSupport( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice );
 
 	// Swapchain Helpers...
-	VkSwapchainKHR CreateSwapchain( const VkDevice& device, const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface, const HWND& windowHandle, VkExtent2D& outExtents );
-	VkSurfaceFormatKHR SwapchainSelectSurfaceFormat( const std::vector<VkSurfaceFormatKHR>& availableFormats );
-	VkPresentModeKHR SwapchainSelectPresentMode( const std::vector<VkPresentModeKHR>& availableModes );
-	VkExtent2D SwapchainGetExtents( const HWND& windowHandle, const VkSurfaceCapabilitiesKHR& capabilities );
-	VkFormat SwapchainGetImageFormat( const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface );
+	vk::SwapchainKHR CreateSwapchain( const vk::Device& device, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const HWND& windowHandle, vk::Extent2D& outExtents, vk::Format& outImageFormat );
+	vk::SurfaceFormatKHR SwapchainSelectSurfaceFormat( const std::vector<vk::SurfaceFormatKHR>& availableFormats );
+	vk::PresentModeKHR SwapchainSelectPresentMode( const std::vector<vk::PresentModeKHR>& availableModes );
+	vk::Extent2D SwapchainGetExtents( const HWND& windowHandle, const vk::SurfaceCapabilitiesKHR& capabilities );
 
-	void CreateSwapchainImages( const VkDevice& device, const VkSwapchainKHR& swapchain, const VkFormat imageFormat, std::vector<VkImage>& outImages, std::vector<VkImageView>& outImageViews );
+	void CreateSwapchainImages( const vk::Device& device, const vk::SwapchainKHR& swapchain, const vk::Format imageFormat, std::vector<vk::Image>& outImages, std::vector<vk::ImageView>& outImageViews );
 
-	VkImageView CreateImageView( const VkDevice& device, const VkImage& image, VkImageViewCreateInfo* createInfo );
-
-	// Command Buffer Helpers...
-	// TODO: Make a good CommandBuffer abstraction 
-	void CommandBufferBegin( const VkCommandBuffer& commandBuffer, VkCommandBufferUsageFlags flags = 0 );
-	void CommandBufferEnd( const VkCommandBuffer& commandBuffer );
-	void CommandBufferSubmit( const VkCommandBuffer& commandBuffer, const VkQueue& queue, bool wait = true );
-	void CommandBufferCopyBuffer(const VkCommandBuffer& commandBuffer, const VkBuffer& source, const VkBuffer& destination, const VkDeviceSize& size );
-	void CommandBufferCopyBufferToImage( const VkCommandBuffer& commandBuffer, const VkBuffer& buffer, const VkImage& image, uint32_t width, uint32_t height );
-	void CommandBufferImageBarrier( const VkCommandBuffer& commandBuffer, VkImage image, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkImageSubresourceRange subresourceRange );
-	void CommandBufferBufferBarrier( const VkCommandBuffer& commandBuffer, VkBuffer buffer, VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask );
-	void CommandBufferStageBarrier( const VkCommandBuffer& commandBuffer, VkPipelineStageFlags2 srcStageMask, VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask );
-
-	void CommandBufferBeginRendering( const VkCommandBuffer& commandBuffer, VkRenderingInfo* renderingInfo );
-	void CommandBufferEndRendering( const VkCommandBuffer& commandBuffer );
-	void CommandBufferSetScissorAndViewport( const VkCommandBuffer& commandBuffer, float width, float height, float x = 0.f, float y = 0.f, float minDepth = 0.f, float maxDepth = 1.f, bool flip = true );
+	vk::ImageView CreateImageView( const vk::Device& device, const vk::Image& image, vk::ImageViewCreateInfo& createInfo );
 
 	// Render Pass Helpers...
-	VkRenderingAttachmentInfo RenderPassGetColorAttachmentInfo( const VkImageView view, VkClearValue* clear, VkImageLayout layout, VkResolveModeFlagBits resolveMode = VK_RESOLVE_MODE_NONE, VkImageView resolveImage = VK_NULL_HANDLE, VkImageLayout resolveLayout = VK_IMAGE_LAYOUT_UNDEFINED );
-	VkRenderingAttachmentInfo RenderPassGetDepthAttachmentInfo( const VkImageView view, VkImageLayout layout );
-	VkRenderingInfo RenderPassCreateRenderingInfo( VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachments, VkRenderingAttachmentInfo* depthAttachment, uint32_t colorAttachmentCount = 1 );
+	vk::RenderingAttachmentInfo RenderPassGetColorAttachmentInfo( const vk::ImageView& view, vk::ClearValue* clear, vk::ImageLayout layout, vk::ResolveModeFlagBits resolveMode = vk::ResolveModeFlagBits::eNone, const vk::ImageView& resolveImage = VK_NULL_HANDLE, vk::ImageLayout resolveLayout = vk::ImageLayout::eUndefined );
+	vk::RenderingAttachmentInfo RenderPassGetDepthAttachmentInfo( const vk::ImageView& view, vk::ImageLayout layout );
+	vk::RenderingInfo RenderPassCreateRenderingInfo( vk::Extent2D renderExtent, vk::RenderingAttachmentInfo* colorAttachments, vk::RenderingAttachmentInfo* depthAttachment, uint32_t colorAttachmentCount = 1 );
 
 	// Pipeline Defaults...
-	VkPipelineMultisampleStateCreateInfo PipelineDefaultMultiSampleState();
-	VkPipelineInputAssemblyStateCreateInfo PipelineDefaultInputAssemblyState();
-	VkPipelineRasterizationStateCreateInfo PipelineDefaultRasterizationState();
-	VkPipelineDepthStencilStateCreateInfo PipelineDefaultDepthStencilState();
-	VkPipelineDynamicStateCreateInfo PipelineDefaultDynamicState();
-	VkPipelineColorBlendAttachmentState PipelineDefaultColorBlendAttachmentState();
+	vk::PipelineMultisampleStateCreateInfo PipelineDefaultMultiSampleState();
+	vk::PipelineInputAssemblyStateCreateInfo PipelineDefaultInputAssemblyState();
+	vk::PipelineRasterizationStateCreateInfo PipelineDefaultRasterizationState();
+	vk::PipelineDepthStencilStateCreateInfo PipelineDefaultDepthStencilState();
+	vk::PipelineDynamicStateCreateInfo PipelineDefaultDynamicState();
+	vk::PipelineColorBlendAttachmentState PipelineDefaultColorBlendAttachmentState();
 }

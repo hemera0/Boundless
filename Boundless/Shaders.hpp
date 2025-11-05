@@ -21,4 +21,11 @@ namespace Boundless {
 		Microsoft::WRL::ComPtr<IDxcCompiler3> m_Compiler = nullptr;
 		Microsoft::WRL::ComPtr<IDxcUtils>	  m_Utils = nullptr;
 	};
+
+	class Shader {
+	public:
+
+	private:
+		ShaderType m_Type;
+	};
 }

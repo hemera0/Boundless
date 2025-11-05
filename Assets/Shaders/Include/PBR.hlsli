@@ -1,3 +1,5 @@
+#ifndef _PBR_HLSLI_
+#define _PBR_HLSLI_
 #include "Util.hlsli"
 
 float DistributionGGX(float NdotH, float roughness) {
@@ -98,3 +100,4 @@ struct PBRMaterial {
         return FssEss * radiance + (FmsEms + kd) * irradiance;
     }
 };
+#endif

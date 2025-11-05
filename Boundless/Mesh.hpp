@@ -15,18 +15,18 @@ namespace Boundless {
 	struct Mesh {
 		void PackVertexData();
 	
-		std::string					m_Name;
-		std::vector<glm::vec3>		m_Positions;
-		std::vector<glm::vec3>		m_Normals;
-		std::vector<glm::vec2>		m_Texcoords;
-		std::vector<glm::vec4>		m_Tangents;
-		std::vector<uint32_t>		m_Indices;
-		std::vector<MeshVertexData> m_Vertices;
-		uint32_t					m_Material = 0; 
-		BufferHandle				m_IndexBuffer = BufferHandle::Invalid;
-		BufferHandle				m_VertexBuffer = BufferHandle::Invalid;
-		BufferHandle				m_BlasBuffer = BufferHandle::Invalid;
-		VkAccelerationStructureKHR	m_Blas = {};
+		std::string					 m_Name;
+		std::vector<glm::vec3>		 m_Positions;
+		std::vector<glm::vec3>		 m_Normals;
+		std::vector<glm::vec2>		 m_Texcoords;
+		std::vector<glm::vec4>		 m_Tangents;
+		std::vector<uint32_t>		 m_Indices;
+		std::vector<MeshVertexData>  m_Vertices;
+		uint32_t					 m_Material = 0; 
+		BufferHandle				 m_IndexBuffer = BufferHandle::Invalid;
+		BufferHandle				 m_VertexBuffer = BufferHandle::Invalid;
+		BufferHandle				 m_BlasBuffer = BufferHandle::Invalid;
+		vk::AccelerationStructureKHR m_Blas = {};
 	};
 
 	enum class EAlphaMode : int32_t {

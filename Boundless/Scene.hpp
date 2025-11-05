@@ -23,9 +23,8 @@ namespace Boundless {
 		void BuildTLAS( Device& device, CommandBuffer& commandBuffer );
 		void UpdateTransforms();
 
-		BufferHandle GetUniformBuffer() const { return m_UniformBuffer; }
 		BufferHandle GetMaterialBuffer() const { return m_MaterialBuffer; }
-		VkAccelerationStructureKHR GetTLAS() const { return m_TLAS; }
+		vk::AccelerationStructureKHR GetTLAS() const { return m_TLAS; }
 
 		// Entity relations
 		entt::entity GetParent(entt::entity entity);
@@ -40,14 +39,13 @@ namespace Boundless {
 		void UploadMaterials( Device& device );
 		void UpdateTransformsRecursive( entt::entity entity );
 
-		Camera					   m_MainCamera; // todo: Remove.
-		entt::registry			   m_Registry;
-		entt::entity			   m_RootEntity;
-		BufferHandle			   m_UniformBuffer = BufferHandle::Invalid; // todo: move to engine
-		BufferHandle			   m_MaterialBuffer = BufferHandle::Invalid;		
-		VkAccelerationStructureKHR m_TLAS = {};
-		BufferHandle			   m_TLASBuffer = BufferHandle::Invalid;
-		BufferHandle			   m_TLASScratchBuffer = BufferHandle::Invalid;
-		BufferHandle			   m_TLASInstances = BufferHandle::Invalid;
+		Camera						 m_MainCamera; // TODO: Remove.
+		entt::registry				 m_Registry;
+		entt::entity				 m_RootEntity;
+		BufferHandle				 m_MaterialBuffer = BufferHandle::Invalid;		
+		vk::AccelerationStructureKHR m_TLAS = {};
+		BufferHandle				 m_TLASBuffer = BufferHandle::Invalid;
+		BufferHandle				 m_TLASScratchBuffer = BufferHandle::Invalid;
+		BufferHandle				 m_TLASInstances = BufferHandle::Invalid;
 	};
 }

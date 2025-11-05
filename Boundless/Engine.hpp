@@ -18,6 +18,7 @@ namespace Boundless {
 		IDxcBlob* FullscreenTriVertexShader;
 		IDxcBlob* FullscreenBlitPixelShader;
 		IDxcBlob* BrdfGenPixelShader;
+		IDxcBlob* SkinningShader;
 	};
 
 	extern EngineShaders g_EngineShaders;
@@ -31,46 +32,55 @@ namespace Boundless {
 		glm::ivec4 m_IblTextures;
 	};
 
+	struct FrameData {
+		CommandBuffer   m_CommandBuffer;
+		vk::CommandPool m_CommandPool;
+		vk::Semaphore   m_ImageAvailableSemaphore;
+		vk::Fence	    m_InFlightFence;
+	};
+
 	class Engine {
 	public:
-		Engine();
+		explicit Engine(GLFWwindow* window);
 		~Engine();
 
 		void Tick( float deltaTime );
 
 		bool ShouldExit();
 
-		CommandBuffer& GetCommandBuffer() { return m_CommandBuffers[ m_CurrentFrame ]; }
+		constexpr static const int MaxFramesInFlight = 2;
+
+		FrameData& GetCurrentFrame() { return m_FrameData[ m_CurrentFrame % MaxFramesInFlight ]; }
+		CommandBuffer& GetCommandBuffer() { return GetCurrentFrame().m_CommandBuffer; }
 	private:
 		void Update( float deltaTime );
 		void Render( float deltaTime );
 
-		void OnResize( );
+		void OnResize();
 		void RecompilePasses();
 
 		void RenderFinalPass( CommandBuffer& commandBuffer, ImageHandle texture );
 		void DestroySwapchain();
-	public:
-		constexpr static const int MaxFramesInFlight = 2;
 	private:
 		GLFWwindow*									   m_GlfwWindow;
-		HWND										   m_WindowHandle;
+		HWND										   m_WindowHandle = 0;
 		std::unique_ptr<Device>						   m_Device;
-		std::array<CommandBuffer, MaxFramesInFlight>   m_CommandBuffers;
-		VkExtent2D									   m_SwapchainExtents;
-		VkSwapchainKHR								   m_Swapchain = VK_NULL_HANDLE;
-		std::vector<VkImage>						   m_SwapchainImages;
-		std::vector<VkImageView>					   m_SwapchainImageViews;
-		std::vector<VkSemaphore>					   m_ImageAvailableSemaphores;
-		std::vector<VkSemaphore>					   m_RenderFinishedSemaphores;
-		std::vector<VkFence>						   m_InFlightFences;
-		VkSemaphore									   m_ComputeFinishedSemaphore = VK_NULL_HANDLE;
-		VkFence										   m_ComputeInFlightFence = VK_NULL_HANDLE;
+		vk::Extent2D								   m_SwapchainExtents;
+		std::vector<vk::ImageView>					   m_SwapchainImageViews;
+		std::vector<vk::Image>						   m_SwapchainImages;
+		std::vector<vk::Semaphore>					   m_SwapchainRenderFinishedSemaphores;
+		vk::Format									   m_SwapchainImageFormat;
+		vk::SwapchainKHR							   m_Swapchain = VK_NULL_HANDLE;
+		std::array<FrameData, MaxFramesInFlight>	   m_FrameData;
+		bool										   m_ResizeRequested = false;
+		//vk::Semaphore								   m_ComputeFinishedSemaphore = VK_NULL_HANDLE;
+		//vk::Fence									   m_ComputeInFlightFence = VK_NULL_HANDLE;
 		uint32_t									   m_CurrentImageIndex = 0;
 		uint32_t									   m_CurrentFrame = 0;
 		ShaderCompiler								   m_ShaderCompiler;
 		FrameConstants								   m_FrameConstants = {};
-		VkPipeline									   m_FullscreenPipeline = VK_NULL_HANDLE;
+		BufferHandle								   m_FrameConstantsBuffer = BufferHandle::Invalid;
+		vk::Pipeline								   m_FullscreenPipeline = VK_NULL_HANDLE;
 		std::unique_ptr<GBufferPass>				   m_GBuffer;
 		std::unique_ptr<GBufferDebugPass>			   m_GBufferDebug;
 		std::unique_ptr<LightingPass>				   m_Lighting;

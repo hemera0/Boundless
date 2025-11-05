@@ -1,7 +1,10 @@
 #include "Pch.hpp"
 
-#define VOLK_IMPLEMENTATION
-#include <volk/volk.h>
+// #define VOLK_IMPLEMENTATION
+// #include <volk/volk.h>
+
+
+#include <vulkan/vulkan.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>

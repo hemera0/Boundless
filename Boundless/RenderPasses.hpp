@@ -5,10 +5,10 @@
 
 namespace Boundless {
 	struct GBufferPushConstants {
-		VkDeviceAddress m_SceneBuffer;
-		VkDeviceAddress m_MaterialsBuffer;
-		VkDeviceAddress m_VertexBuffer;
-		uint32_t		m_MaterialIndex;
+		vk::DeviceAddress m_FrameConstantsBuffer;
+		vk::DeviceAddress m_MaterialsBuffer;
+		vk::DeviceAddress m_VertexBuffer;
+		uint32_t		  m_MaterialIndex;
 	};
 
 	struct GBufferDebugPushConstants {
@@ -18,9 +18,9 @@ namespace Boundless {
 	};
 
 	struct LightingPushConstants {
-		VkDeviceAddress m_SceneBuffer;
-		uint32_t		m_GBufferTexture;
-		uint32_t		m_GBufferDepthTexture;
+		vk::DeviceAddress m_FrameConstantsBuffer;
+		uint32_t		  m_GBufferTexture;
+		uint32_t		  m_GBufferDepthTexture;
 	};
 
 	struct CompositePushConstants {
@@ -33,12 +33,26 @@ namespace Boundless {
 		uint32_t m_Texture;
 	};
 
+	struct SkinningPushConstants {
+		vk::DeviceAddress m_VertexBuffer;
+		vk::DeviceAddress m_SkinnedVertexBuffer;
+		vk::DeviceAddress m_BoneIndicesBuffer;
+		vk::DeviceAddress m_BoneWeightsBuffer;
+		vk::DeviceAddress m_BoneTransformsBuffer;
+		uint32_t		  m_VertexCount;
+	};
+
+	struct GBufferOutput {
+		ImageHandle m_GBuffer;
+		ImageHandle m_DepthBuffer;
+	};
+
 	class GBufferPass : public BaseRenderPass {
 	public:
 		GBufferPass( const Viewport& viewport );
 		
 		virtual void CreatePassResources( Device& device ) override;
-		void Render( CommandBuffer& commandBuffer, Device& device, Scene& scene );
+		[[nodiscard]] GBufferOutput Render( CommandBuffer& commandBuffer, Device& device, BufferHandle frameConstantsBuffer, Scene& scene );
 	};
 
 	class GBufferDebugPass : public BaseRenderPass {
@@ -54,7 +68,7 @@ namespace Boundless {
 		LightingPass( const Viewport& viewport );
 	
 		virtual void CreatePassResources( Device& device ) override;
-		void Render( CommandBuffer& commandBuffer, Device& device, Scene& scene, ImageHandle gbufferTexture, ImageHandle depthTexture );
+		void Render( CommandBuffer& commandBuffer, Device& device, BufferHandle frameConstantsBuffer, Scene& scene, const GBufferOutput& gbufferOutput );
 	};
 
 	class CompositePass : public BaseRenderPass {
@@ -63,5 +77,36 @@ namespace Boundless {
 
 		virtual void CreatePassResources( Device& device ) override;
 		void Render( CommandBuffer& commandBuffer, Device& device, ImageHandle texture );
+	};
+
+	class RaytracedReflectionsPass : public BaseRenderPass {
+	public:
+		RaytracedReflectionsPass( const Viewport& viewport );
+
+		virtual void CreatePassResources( Device& device ) override;
+		void Dispatch( CommandBuffer& commandBuffer, Device& device );
+	};
+
+	// TODO: maybe switch the scene rendering to use DrawIndirect? 
+	// Alternative build a buffer with a 1:3 bitfield [draw, entityIndex]
+	class FrustumCullPass : public BaseRenderPass {
+	public:
+
+	};
+
+	class SkinningPass : public BaseRenderPass {
+	public:
+		SkinningPass( const Viewport& viewport );
+
+		virtual void CreatePassResources( Device& device ) override;
+		void Dispatch( CommandBuffer& commandBuffer, Device& device, Scene& scene );
+	};
+
+	class BloomPass : public BaseRenderPass {
+	public:
+		BloomPass( const Viewport& viewport );
+
+		virtual void CreatePassResources( Device& device ) override;
+		void Dispatch( CommandBuffer& commandBuffer, Device& device, ImageHandle lightingOutput );
 	};
 }

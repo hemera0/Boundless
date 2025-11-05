@@ -1,3 +1,5 @@
+#ifndef _MATERIAL_HLSLI_
+#define _MATERIAL_HLSLI_
 struct Material {
 	int Index;
 	float3 Pad0;
@@ -15,3 +17,4 @@ struct Material {
 	float4 Albedo;
 	float4 Emissive;
 };
+#endif

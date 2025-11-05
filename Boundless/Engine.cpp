@@ -12,33 +12,9 @@
 namespace Boundless {
 	EngineShaders g_EngineShaders = {};
 
-	static void MouseCallback( GLFWwindow* window, double xpos, double ypos ) {
-		g_Input->SetMousePos( glm::vec2{ xpos, ypos } );
-	}
-
-	static void KeyCallback( GLFWwindow* window, int key, int scancode, int action, int mods ) {
-		g_Input->SetKeyState( key, action );
-	}
-
-	Engine::Engine() {
-		glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-
-		m_GlfwWindow = glfwCreateWindow( 1280, 720, "Boundless", nullptr, nullptr );
-		if ( !m_GlfwWindow ) {
-			printf( "Failed to create engine window\n" );
-			return;
-		}
-
-		glfwSetInputMode(m_GlfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		glfwSetCursorPosCallback( m_GlfwWindow, &MouseCallback);
-		glfwSetKeyCallback( m_GlfwWindow, &KeyCallback);
-		glfwSetWindowUserPointer( m_GlfwWindow, this );
-
+	Engine::Engine( GLFWwindow* window ) : m_GlfwWindow( window ) {
 		m_WindowHandle = glfwGetWin32Window( m_GlfwWindow );
 		m_Device	   = std::make_unique<Device>( m_WindowHandle );
-
-		for ( auto i = 0; i < m_CommandBuffers.size(); i++ )
-			m_CommandBuffers[ i ] = CommandBuffer( *m_Device );
 
 		// Compile shaders.
 		g_EngineShaders.GBufferPixelShader		  = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\GBufferPS.hlsl", ShaderType::PixelShader );
@@ -49,58 +25,50 @@ namespace Boundless {
 		g_EngineShaders.CompositePixelShader	  = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\ComposePS.hlsl", ShaderType::PixelShader );
 		g_EngineShaders.FullscreenTriVertexShader = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\FullscreenVS.hlsl", ShaderType::VertexShader );
 		g_EngineShaders.BrdfGenPixelShader		  = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\IBL\\BRDFGenPS.hlsl", ShaderType::PixelShader );
-
+		g_EngineShaders.SkinningShader			  = m_ShaderCompiler.CompileShader( L"..\\Assets\\Shaders\\SkinningCS.hlsl", ShaderType::ComputeShader );
+		
 		// Create Swapchain...
 		OnResize();
 
 		// Create Sync Objects...
-		VkSemaphoreCreateInfo semaphoreCreateInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-		VkFenceCreateInfo fenceCreateInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-		fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		vk::SemaphoreCreateInfo semaphoreCreateInfo = {};
+		vk::FenceCreateInfo fenceCreateInfo = { vk::FenceCreateFlagBits::eSignaled };
 
-		m_ImageAvailableSemaphores.resize( m_SwapchainImageViews.size() );
-		m_RenderFinishedSemaphores.resize( m_SwapchainImageViews.size() );
-		m_InFlightFences.resize( m_SwapchainImageViews.size() );
+		const vk::Device& device = m_Device->GetDevice();
 
-		VkDevice device = m_Device->GetDevice();
+		for ( auto i = 0; i < MaxFramesInFlight; i++ ) {
+			FrameData& fd = m_FrameData[ i ];			
+			fd.m_CommandPool			 = device.createCommandPool( vk::CommandPoolCreateInfo{ vk::CommandPoolCreateFlagBits::eResetCommandBuffer, m_Device->GetQueueIndex() } );
+			fd.m_CommandBuffer			 = CommandBuffer( *m_Device, fd.m_CommandPool );
+			fd.m_ImageAvailableSemaphore = device.createSemaphore( semaphoreCreateInfo );
+			fd.m_InFlightFence		     = device.createFence( fenceCreateInfo );
+		}
 
-		for ( auto i = 0; i < m_SwapchainImageViews.size(); i++ ) {
-			if ( vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphores[ i ] ) != VK_SUCCESS ||
-				vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[ i ] ) != VK_SUCCESS ||
-				vkCreateFence( device, &fenceCreateInfo, nullptr, &m_InFlightFences[ i ] ) != VK_SUCCESS ) {
-				printf( "Failed to create VkSemaphore objects or VkFence\n" );
-				return;
+		m_SwapchainRenderFinishedSemaphores.resize( m_SwapchainImages.size() );
+		for ( auto i = 0; i < m_SwapchainRenderFinishedSemaphores.size(); i++ ) {
+			m_SwapchainRenderFinishedSemaphores[ i ] = device.createSemaphore( semaphoreCreateInfo );
+		}
+
+		m_FrameConstantsBuffer = m_Device->CreateBuffer( Buffer::Desc{
+				.m_Size = sizeof( FrameConstants ),
+				.m_Usage = vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+				.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO,
+				.m_Mappable = true
 			}
-		}
+		);
 
-		if ( vkCreateSemaphore( device, &semaphoreCreateInfo, nullptr, &m_ComputeFinishedSemaphore ) != VK_SUCCESS ||
-			vkCreateFence( device, &fenceCreateInfo, nullptr, &m_ComputeInFlightFence ) != VK_SUCCESS ) {
-			printf( "Failed to create compute VkSemaphore or VkFence\n" );
-			return;
-		}
-
-		// This is temporary...
-		VkPhysicalDevice physicalDevice = m_Device->GetPhysicalDevice();
-		VkSurfaceKHR surface = m_Device->GetSurface();
-
-		const auto imageFormat = VkUtil::SwapchainGetImageFormat( physicalDevice, surface );
+		// m_ComputeFinishedSemaphore = device.createSemaphore( semaphoreCreateInfo );
+		// m_ComputeInFlightFence = device.createFence( fenceCreateInfo );
 
 		m_FullscreenPipeline = PipelineBuilder{}
-			.SetShaderBlobs( { { g_EngineShaders.FullscreenBlitPixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.FullscreenTriVertexShader, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetColorAttachmentFormats( { imageFormat } )
+			.SetShaderBlobs( { { g_EngineShaders.FullscreenBlitPixelShader, vk::ShaderStageFlagBits::eFragment }, { g_EngineShaders.FullscreenTriVertexShader, vk::ShaderStageFlagBits::eVertex } } )
+			.SetColorAttachmentFormats( m_SwapchainImageFormat )
 			.SetPipelineLayout( m_Device->GetGlobalPipelineLayout() )
-			.Build( device );
+			.Build( *m_Device );
 
 		const auto& extents = m_SwapchainExtents;
 
-		auto defaultCamera = Camera::StationaryLookAtCamera( 
-			{ 0.f, 0.f, 5.f }, 
-			{ 0.f, 0.f, 0.f }, 
-			{ 0.f, 1.f, 0.f }, 
-			90.f, 
-			extents.width / float( extents.height ), 
-			0.1f 
-		);
+		Camera defaultCamera = Camera::StationaryLookAtCamera(  { 0.f, 0.f, 5.f }, { 0.f, 0.f, 0.f }, { 0.f, 1.f, 0.f }, 90.f, extents.width / float( extents.height ), 0.1f );
 
 		m_Scene.SetMainCamera( defaultCamera );
 
@@ -121,26 +89,22 @@ namespace Boundless {
 	}
 
 	Engine::~Engine() {
-		VkDevice device = m_Device->GetDevice();
-		VkCommandPool commandPool = m_Device->GetCommandPool();
+		const vk::Device& device = m_Device->GetDevice();
+		const vk::CommandPool& commandPool = m_Device->GetCommandPool();
 
-		vkDeviceWaitIdle( device );
-		vkDestroyCommandPool( device, commandPool, nullptr );
+		device.waitIdle();
+		device.destroyCommandPool( commandPool );
 
 		DestroySwapchain();
 
-		// Destroy sync objects...
-		for( VkSemaphore semaphore : m_ImageAvailableSemaphores )
-			vkDestroySemaphore( device, semaphore, nullptr );
-
-		for ( VkSemaphore semaphore : m_RenderFinishedSemaphores )
-			vkDestroySemaphore( device, semaphore, nullptr );
-
-		for( VkFence fence : m_InFlightFences )
-			vkDestroyFence( device, fence, nullptr );
-
-		vkDestroySemaphore( device, m_ComputeFinishedSemaphore, nullptr );
-		vkDestroyFence( device, m_ComputeInFlightFence, nullptr );
+		for( FrameData& frameData : m_FrameData ) {
+			device.destroyCommandPool( frameData.m_CommandPool );
+			device.destroySemaphore( frameData.m_ImageAvailableSemaphore );
+			device.destroyFence( frameData.m_InFlightFence );
+		}
+		
+		for ( vk::Semaphore& semaphore : m_SwapchainRenderFinishedSemaphores )
+			device.destroySemaphore( semaphore );
 	}
 
 	void Engine::Tick( float dt ) {
@@ -176,78 +140,76 @@ namespace Boundless {
 	}
 
 	void Engine::GenerateBrdfLut() {
-		VkFormat brdfFormat = VK_FORMAT_R16G16_SFLOAT;
+		vk::Format brdfFormat = vk::Format::eR16G16Sfloat;
 		const int lutDim = 512;
 
 		Image::Desc brdfDesc = Image::Desc{
 				.m_Width = lutDim,
 				.m_Height = lutDim,
 				.m_Format = brdfFormat,
-				.m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				.m_Usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 		};
 
 		ImageHandle brdfTex = m_Device->CreateImage( brdfDesc );
 		m_BrdfLut = m_Device->CreateImageView( brdfTex, brdfDesc );
 
-		VkPipelineLayout brdfLutGenPipelineLayout = PipelineLayoutBuilder()
+		vk::PipelineLayout brdfLutGenPipelineLayout = PipelineLayoutBuilder()
 			.SetDescriptorSets( { m_Device->GetGlobalResourceLayout() } )
-			.Build( m_Device->GetDevice() );
+			.Build( *m_Device );
 
-		VkPipeline brdfLutGenPipeline = PipelineBuilder{}
-			.SetShaderBlobs( { { g_EngineShaders.BrdfGenPixelShader, VK_SHADER_STAGE_FRAGMENT_BIT }, { g_EngineShaders.FullscreenTriVertexShader, VK_SHADER_STAGE_VERTEX_BIT } } )
-			.SetColorAttachmentFormats( { brdfFormat } )
+		vk::Pipeline brdfLutGenPipeline = PipelineBuilder{}
+			.SetShaderBlobs( { { g_EngineShaders.BrdfGenPixelShader, vk::ShaderStageFlagBits::eFragment }, { g_EngineShaders.FullscreenTriVertexShader, vk::ShaderStageFlagBits::eVertex } } )
+			.SetColorAttachmentFormats( brdfFormat )
 			.SetPipelineLayout( brdfLutGenPipelineLayout )
-			.Build( m_Device->GetDevice() );
+			.Build( *m_Device );
 
 		CommandBuffer commandBuffer = CommandBuffer( *m_Device );
-
 		commandBuffer.Begin();
 
-		VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-		VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( m_Device->GetImage( m_BrdfLut ), &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
-		VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( VkExtent2D{ lutDim, lutDim }, &colorAttachment, nullptr );
+		vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
+		vk::RenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( m_Device->GetImage( m_BrdfLut ), &clearValue, vk::ImageLayout::eAttachmentOptimal );
+		vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( VkExtent2D{ lutDim, lutDim }, &colorAttachment, nullptr );
 
-		commandBuffer.BeginRendering(&renderingInfo);
+		commandBuffer.BeginRendering(renderingInfo);
 		commandBuffer.SetScissorAndViewport( m_Device->GetImage( brdfTex ) );
 		commandBuffer.BindPipeline(brdfLutGenPipeline);
 
-		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
-		vkCmdSetFrontFace( commandBuffer, VK_FRONT_FACE_COUNTER_CLOCKWISE );
-		vkCmdDraw(commandBuffer, 3, 1, 0, 0 );
+		commandBuffer->setCullMode( vk::CullModeFlagBits::eFront );
+		commandBuffer->setFrontFace( vk::FrontFace::eCounterClockwise );
+		commandBuffer->draw( 3, 1, 0, 0 );
 
 		commandBuffer.EndRendering();
 		commandBuffer.ImageBarrier( 
 			m_Device->GetImage( brdfTex ),
-			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+			vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlagBits::eShaderRead,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers }
 		);
 
 		commandBuffer.End();
-		commandBuffer.Submit(m_Device->GetGraphicsQueue());
+		commandBuffer.Submit( m_Device->GetQueue() );
 
-		VkCommandBuffer handle = commandBuffer;
-		vkFreeCommandBuffers(m_Device->GetDevice(), m_Device->GetCommandPool(), 1, &handle);
-		vkDestroyPipelineLayout( m_Device->GetDevice(), brdfLutGenPipelineLayout, nullptr );
-		vkDestroyPipeline(m_Device->GetDevice(), brdfLutGenPipeline, nullptr);
+		const vk::Device& device = m_Device->GetDevice();
+		device.destroyPipelineLayout( brdfLutGenPipelineLayout );
+		device.destroyPipeline( brdfLutGenPipeline );
 	}
 
 	void Engine::DestroySwapchain() {
-		VkDevice device = m_Device->GetDevice();
+		const vk::Device& device = m_Device->GetDevice();
 
-		vkDeviceWaitIdle( device );
+		device.waitIdle();
 
-		for( VkImageView imageView : m_SwapchainImageViews )
-			vkDestroyImageView( device, imageView, nullptr );
+		for( const vk::ImageView& imageView : m_SwapchainImageViews )
+			device.destroyImageView( imageView );
 
 		m_SwapchainImages.clear();
 		m_SwapchainImageViews.clear();
 
-		vkDestroySwapchainKHR( device, m_Swapchain, nullptr );
+		device.destroySwapchainKHR( m_Swapchain );
 	}
 
 	void Engine::Update( float deltaTime ) {
@@ -258,30 +220,42 @@ namespace Boundless {
 	}
 
 	void Engine::Render( float deltaTime ) {
-		VkDevice device = m_Device->GetDevice();
+		const vk::Device& device = m_Device->GetDevice();
 
-		vkWaitForFences( device, 1, &m_InFlightFences[ m_CurrentFrame ], VK_TRUE, std::numeric_limits<uint64_t>::max() );
-		vkResetFences( device, 1, &m_InFlightFences[ m_CurrentFrame ] );
+		if ( m_ResizeRequested ) {
+			device.waitIdle();
 
-		VkResult result = vkAcquireNextImageKHR( device, m_Swapchain, std::numeric_limits<uint64_t>::max(), m_ImageAvailableSemaphores[ m_CurrentFrame ], VK_NULL_HANDLE, &m_CurrentImageIndex );
-		if ( result == VK_ERROR_OUT_OF_DATE_KHR ) {
 			OnResize();
+			
+			m_ResizeRequested = false;
+		}
+
+		FrameData& currentFrame = GetCurrentFrame();
+
+		while ( vk::Result::eTimeout == device.waitForFences( currentFrame.m_InFlightFence, vk::True, std::numeric_limits<uint64_t>::max() ) )
+			_mm_pause();
+
+		device.resetFences( currentFrame.m_InFlightFence );
+		
+		try {
+			const auto [ result, value ] = device.acquireNextImageKHR( m_Swapchain, std::numeric_limits<uint64_t>::max(), currentFrame.m_ImageAvailableSemaphore, VK_NULL_HANDLE );
+			m_CurrentImageIndex = value;
+		} catch ( vk::OutOfDateKHRError error ) {
+			m_ResizeRequested = true;
 			return;
-		} else if ( result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR ) {
-			printf( "Failed to acquire swap chain image\n" );
 		}
 
 		CommandBuffer& commandBuffer = GetCommandBuffer();
-		vkResetCommandBuffer( commandBuffer, 0 );
-		commandBuffer.Begin();
-
+		commandBuffer->reset();
+		
+		commandBuffer.Begin( vk::CommandBufferUsageFlagBits::eOneTimeSubmit );
 		{
 			commandBuffer.BindDefaults( *m_Device );
 
-			static bool tlasRebuild = true;
-			if( tlasRebuild ) {
+			static bool rebuiltTLAS;
+			if( !rebuiltTLAS ) {
 				m_Scene.BuildTLAS( *m_Device, commandBuffer );
-				tlasRebuild = false;
+				rebuiltTLAS = true;
 			}
 
 			const auto& camera = m_Scene.GetMainCamera();
@@ -289,18 +263,15 @@ namespace Boundless {
 			m_FrameConstants.m_CameraViewProjectionMatrix = camera.GetViewProjectionMatrix();
 			m_FrameConstants.m_CameraInvViewProjectionMatrix = glm::inverse( camera.GetViewProjectionMatrix() );
 			m_FrameConstants.m_CameraPosition = camera.GetInvViewMatrix()[ 3 ];
-			
 			m_FrameConstants.m_SunColor = { 1.f, 1.f, 1.f, 1.f };
 			m_FrameConstants.m_SunDirection = glm::normalize( glm::vec4{ 0.25f, -0.9f, 0.f, 1.f } );
 			m_FrameConstants.m_IblTextures = { m_DiffuseIbl, m_SpecularIbl, m_BrdfLut, 0 };
 
-			// TODO: Move this uniform buffer to Engine
-			m_Device->GetBuffer( m_Scene.GetUniformBuffer() ).Patch( &m_FrameConstants, sizeof( m_FrameConstants ) );
+			Buffer& frameConstantsBuffer = m_Device->GetBuffer( m_FrameConstantsBuffer );
+			frameConstantsBuffer.Patch( &m_FrameConstants, sizeof( m_FrameConstants ) );
 
 			// GBuffer.
-			{
-				m_GBuffer->Render( commandBuffer, *m_Device, m_Scene );
-			}
+			GBufferOutput gbufferOutput = m_GBuffer->Render( commandBuffer, *m_Device, m_FrameConstantsBuffer, m_Scene );
 
 			// RT Shadows.
 			{
@@ -319,12 +290,12 @@ namespace Boundless {
 			
 			// Lighting.
 			{
-				m_Lighting->Render( commandBuffer, *m_Device, m_Scene, m_GBuffer->GetRenderTargetView(), m_GBuffer->GetDepthBufferView() );
+				m_Lighting->Render( commandBuffer, *m_Device, m_FrameConstantsBuffer, m_Scene, gbufferOutput );
 			}
 
 			// Bloom.
 			{
-			
+				
 			}
 
 			// Post Processing.
@@ -354,87 +325,76 @@ namespace Boundless {
 		commandBuffer.End();
 
 		// Present.
-		VkSemaphore waitSemaphores[ ] = { m_ImageAvailableSemaphores[ m_CurrentFrame ] };
-		VkPipelineStageFlags waitStages[ ] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+		vk::CommandBufferSubmitInfo cmdInfo = vk::CommandBufferSubmitInfo( commandBuffer );
+		vk::SemaphoreSubmitInfo waitInfo    = vk::SemaphoreSubmitInfo( currentFrame.m_ImageAvailableSemaphore, 1, vk::PipelineStageFlagBits2::eColorAttachmentOutput, 0 );
+		vk::SemaphoreSubmitInfo signalInfo  = vk::SemaphoreSubmitInfo( m_SwapchainRenderFinishedSemaphores[ m_CurrentImageIndex ], 1, vk::PipelineStageFlagBits2::eAllGraphics, 0 );
 
-		VkCommandBuffer commandBuffers[ ] = { commandBuffer };
+		vk::SubmitInfo2 submitInfo =  {};
+		submitInfo.setCommandBufferInfos( cmdInfo )
+			.setWaitSemaphoreInfos( waitInfo )
+			.setSignalSemaphoreInfos( signalInfo );
 
-		VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-		submitInfo.waitSemaphoreCount = _countof( waitSemaphores );
-		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
-		submitInfo.commandBufferCount = _countof( commandBuffers );
-		submitInfo.pCommandBuffers = commandBuffers;
+		const vk::Queue& queue = m_Device->GetQueue();
+		queue.submit2( submitInfo, currentFrame.m_InFlightFence );
 
-		VkSemaphore signalSemaphores[ ] = { m_RenderFinishedSemaphores[ m_CurrentImageIndex ] };
-		submitInfo.signalSemaphoreCount = _countof( signalSemaphores );
-		submitInfo.pSignalSemaphores = signalSemaphores;
+		vk::PresentInfoKHR presentInfo = {};
+		presentInfo.setSwapchains( m_Swapchain )
+			.setWaitSemaphores( m_SwapchainRenderFinishedSemaphores[ m_CurrentImageIndex ] )
+			.setPImageIndices( &m_CurrentImageIndex );
 
-		result = vkQueueSubmit( m_Device->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[ m_CurrentFrame ] );
-		if ( result != VK_SUCCESS ) {
-			printf( "Failed to submit draw command buffer: %d\n", result );
+		try {
+			vk::Result result = queue.presentKHR(presentInfo);
 		}
-
-		VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-		presentInfo.waitSemaphoreCount = _countof( signalSemaphores );
-		presentInfo.pWaitSemaphores = signalSemaphores;
-
-		VkSwapchainKHR swapchains[ ] = { m_Swapchain };
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = swapchains;
-		presentInfo.pImageIndices = &m_CurrentImageIndex;
-
-		result = vkQueuePresentKHR( m_Device->GetPresentQueue(), &presentInfo );
-		if ( result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ) {
-			OnResize();
-		} else if ( result != VK_SUCCESS ) {
-			printf( "Failed to present swap chain image!" );
+		catch ( vk::OutOfDateKHRError error )
+		{
+			m_ResizeRequested = true;
 		}
 
 		m_CurrentFrame = ( m_CurrentFrame + 1 ) % MaxFramesInFlight;
 	}
 
-	void Engine::OnResize() { 
+	void Engine::OnResize() {
+		const vk::Device& device = m_Device->GetDevice();
+
 		if( m_Swapchain != VK_NULL_HANDLE) {
 			DestroySwapchain();
 		}
 
-		m_Swapchain = VkUtil::CreateSwapchain( m_Device->GetDevice(), m_Device->GetPhysicalDevice(), m_Device->GetSurface(), m_WindowHandle, m_SwapchainExtents );
+		m_Swapchain = VkUtil::CreateSwapchain( device, m_Device->GetPhysicalDevice(), m_Device->GetSurface(), m_WindowHandle, m_SwapchainExtents, m_SwapchainImageFormat );
 
-		const auto imageFormat = VkUtil::SwapchainGetImageFormat( m_Device->GetPhysicalDevice(), m_Device->GetSurface() );
-		VkUtil::CreateSwapchainImages( m_Device->GetDevice(), m_Swapchain, imageFormat, m_SwapchainImages, m_SwapchainImageViews );
+		VkUtil::CreateSwapchainImages( device, m_Swapchain, m_SwapchainImageFormat, m_SwapchainImages, m_SwapchainImageViews );
 
 		RecompilePasses();
 	}
 
 	void Engine::RenderFinalPass( CommandBuffer& commandBuffer, ImageHandle texture ) {
-		VkImage currentImage = m_SwapchainImages[ m_CurrentImageIndex ];
-		VkImageView currentView = m_SwapchainImageViews[ m_CurrentImageIndex ];
+		vk::Image currentImage = m_SwapchainImages[ m_CurrentImageIndex ];
+		vk::ImageView currentView = m_SwapchainImageViews[ m_CurrentImageIndex ];
 
-		VkClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-		VkRenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( currentView, &clearValue, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL );
-		VkRenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, nullptr );
+		vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
+		vk::RenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( currentView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
+		vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, nullptr );
 
-		commandBuffer.BeginRendering(&renderingInfo);
+		commandBuffer.BeginRendering(renderingInfo);
 		commandBuffer.SetScissorAndViewport( float( m_SwapchainExtents.width ), float( m_SwapchainExtents.height ), 0.f, 0.f, 0.f, 1.f, false );
 		commandBuffer.BindPipeline( m_FullscreenPipeline );
 
 		BlitPushConstants pc = { uint32_t( texture ) };
 		commandBuffer.BindPushConstants( *m_Device, &pc, sizeof( pc ) );
 		
-		vkCmdSetCullMode( commandBuffer, VK_CULL_MODE_FRONT_BIT );
-		vkCmdDraw( commandBuffer, 3, 1, 0, 0 );
+		commandBuffer->setCullMode( vk::CullModeFlagBits::eFront );
+		commandBuffer->draw(3, 1, 0, 0 );
 
 		commandBuffer.EndRendering();
 		commandBuffer.ImageBarrier(
 			currentImage,
-			VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			0,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 } 
+			vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlags{},
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::ePresentSrcKHR,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits::eBottomOfPipe, 
+			vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers }
 		);
 	}
 }
