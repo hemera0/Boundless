@@ -17,7 +17,7 @@ namespace Boundless {
 
 			if( m_DepthTargetView != ImageHandle::Invalid ) {
 				const vk::ImageView& depthView = device.GetImage( m_DepthTargetView );
-				depthAttachment = VkUtil::RenderPassGetDepthAttachmentInfo( depthView, vk::ImageLayout::eAttachmentOptimal );
+				depthAttachment = vk_util::RenderPassGetDepthAttachmentInfo( depthView, vk::ImageLayout::eAttachmentOptimal );
 			}
 			
 			colorAttachments.resize( m_RenderTargets.size() );
@@ -26,11 +26,11 @@ namespace Boundless {
 				const vk::ImageView& colorView = device.GetImage( m_RenderTargetViews[i] );
 				
 				vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-				colorAttachments[i] = VkUtil::RenderPassGetColorAttachmentInfo( colorView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
+				colorAttachments[i] = vk_util::RenderPassGetColorAttachmentInfo( colorView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
 			}
 
 			vk::RenderingAttachmentInfo* depthInfo = m_DepthTargetView == ImageHandle::Invalid ? nullptr : &depthAttachment;
-			vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_Viewport.Size, colorAttachments.data(), depthInfo, uint32_t( colorAttachments.size() ) );
+			vk::RenderingInfo renderingInfo = vk_util::RenderPassCreateRenderingInfo( m_Viewport.Size, colorAttachments.data(), depthInfo, uint32_t( colorAttachments.size() ) );
 
 			commandBuffer.BeginRendering(renderingInfo);
 		}

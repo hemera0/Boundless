@@ -56,7 +56,9 @@ namespace Boundless {
 			shaderPath.c_str(), // (Optional) name of the shader file to be displayed e.g. in an error message
 			L"-E", L"main", // Shader main entry point
 			L"-T", targetProfile, // Shader target profile
-			L"-spirv" // Compile to SPIRV
+			L"-HV", L"2021", // HLSL Language Version
+			L"-spirv", // Compile to SPIRV
+			L"-Zpc"	   // Pack matrices in column-major order
 		};
 
 		ComPtr<IDxcResult> result = nullptr;

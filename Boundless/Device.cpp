@@ -23,12 +23,12 @@ namespace Boundless {
 			// VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		};
 
-		m_Instance = VkUtil::CreateInstance( glfwExtensions, extensionCount );
+		m_Instance = vk_util::CreateInstance( glfwExtensions, extensionCount );
 		VULKAN_HPP_DEFAULT_DISPATCHER.init( m_Instance );
 
-		m_PhysicalDevice = VkUtil::GetPhysicalDevice( m_Instance, extensions );
-		m_Surface	     = VkUtil::CreateSurfaceForWindow( m_Instance, windowHandle );
-		m_Device		 = VkUtil::CreateLogicalDevice( m_Instance, m_PhysicalDevice, m_Surface, extensions );
+		m_PhysicalDevice = vk_util::GetPhysicalDevice( m_Instance, extensions );
+		m_Surface	     = vk_util::CreateSurfaceForWindow( m_Instance, windowHandle );
+		m_Device		 = vk_util::CreateLogicalDevice( m_Instance, m_PhysicalDevice, m_Surface, extensions );
 		VULKAN_HPP_DEFAULT_DISPATCHER.init( m_Device );
 
 		VmaAllocatorCreateInfo allocInfo = {};
@@ -47,7 +47,7 @@ namespace Boundless {
 
 		vmaCreateAllocator( &allocInfo, &m_Allocator );
 
-		m_QueueIndex = VkUtil::FindQueueFamilyIndex( m_Surface, m_PhysicalDevice );
+		m_QueueIndex = vk_util::FindQueueFamilyIndex( m_Surface, m_PhysicalDevice );
 		m_Queue = m_Device.getQueue( m_QueueIndex, 0 );
 		
 		// TODO: maybe move or remove this? (It's useful though for things like mipmap gen, staging buffer copies, etc.)
@@ -201,6 +201,7 @@ namespace Boundless {
 		}
 
 		createInfo.format = imageDesc.m_Format;
+		createInfo.image = m_AllImages[ size_t( resource ) ];
 
 		bool isDepthImage = ( imageDesc.m_Usage & vk::ImageUsageFlagBits::eDepthStencilAttachment ) || ( imageDesc.m_Format == vk::Format::eD32Sfloat );
 		vk::ImageAspectFlags aspectMask =  isDepthImage ? vk::ImageAspectFlagBits::eDepth : vk::ImageAspectFlagBits::eColor;
@@ -208,7 +209,7 @@ namespace Boundless {
 		// TODO: Fixme. (I think it's good?)
 		createInfo.setSubresourceRange( vk::ImageSubresourceRange{ aspectMask, 0, imageDesc.m_Levels, 0, imageDesc.m_Layers });
 
-		res.m_ImageView = VkUtil::CreateImageView( m_Device, m_AllImages[size_t(resource)], createInfo );
+		res.m_ImageView = m_Device.createImageView( createInfo );
 
 		size_t newId = m_AllImages.size();
 
@@ -421,8 +422,9 @@ namespace Boundless {
 		textureView.viewType = vk::ImageViewType( texture.viewType );
 		textureView.format = vk::Format( texture.imageFormat );
 		textureView.subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, texture.levelCount, 0, texture.layerCount };
-		
-		res.m_ImageView = VkUtil::CreateImageView( m_Device, res.m_Image, textureView );
+		textureView.image = res.m_Image;
+
+		res.m_ImageView = m_Device.createImageView( textureView );
 		m_AllImages.push_back( res );
 
 		ImageHandle viewHandle = ImageHandle( m_AllImages.size() - 1 );

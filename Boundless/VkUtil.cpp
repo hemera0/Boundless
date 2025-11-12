@@ -1,7 +1,7 @@
 #include "Pch.hpp"
 #include "VkUtil.hpp"
 
-namespace VkUtil {
+namespace vk_util {
 	constexpr const bool UseValidationLayers = true;
 
 	vk::Instance CreateInstance( const char** requiredExtensions, const int requiredExtensionsCount ) {
@@ -19,9 +19,7 @@ namespace VkUtil {
 		}
 
 		if constexpr ( UseValidationLayers ) {
-			std::array<const char*, 1> validationLayers = {
-				"VK_LAYER_KHRONOS_validation",
-			};
+			std::array<const char*, 1> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 
 			std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties( );
 
@@ -51,7 +49,7 @@ namespace VkUtil {
 	}
 
 	vk::PhysicalDevice GetPhysicalDevice( const vk::Instance& instance, const std::vector<const char*>& wantedExtensions ) {
-		std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices(  );
+		std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices( );
 		if ( devices.empty() ) {
 			printf( "Failed to find vulkan enabled GPUs\n" );
 			return VK_NULL_HANDLE;
@@ -72,22 +70,13 @@ namespace VkUtil {
 	}
 
 	vk::Device CreateLogicalDevice( const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const std::vector<const char*>& wantedExtensions ) {
-		const auto& swapChainSupport = QuerySwapchainSupport( surface, physicalDevice );
-		if ( swapChainSupport.m_PresentModes.empty() || swapChainSupport.m_SurfaceFormats.empty() ) {
-			printf( "Device does not have any present modes or surface formats\n" );
-			return VK_NULL_HANDLE;
-		}
-
 		uint32_t queueFamilyIndex = FindQueueFamilyIndex( surface, physicalDevice );
 		if ( queueFamilyIndex == vk::QueueFamilyIgnored ) {
 			printf( "Failed to find valid queue family\n" );
 			return VK_NULL_HANDLE;
 		}
 
-		float queuePriority = 1.0f;
-
 		vk::StructureChain queryChain = physicalDevice.getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan14Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceVulkan12Features>();
-		
 		vk::PhysicalDeviceVulkan14Features& testFeatures14 = queryChain.get<vk::PhysicalDeviceVulkan14Features>();
 		vk::PhysicalDeviceVulkan13Features& testFeatures13 = queryChain.get<vk::PhysicalDeviceVulkan13Features>();
 		vk::PhysicalDeviceVulkan12Features& testFeatures12 = queryChain.get<vk::PhysicalDeviceVulkan12Features>();
@@ -114,6 +103,8 @@ namespace VkUtil {
 		deviceCreateInfo.setPEnabledFeatures(&deviceFeatures);
 		deviceCreateInfo.setPEnabledExtensionNames( wantedExtensions );
 
+		float queuePriority = 1.0f;
+
 		vk::DeviceQueueCreateInfo queueCreateInfo = {};
 		queueCreateInfo.setQueueFamilyIndex( queueFamilyIndex )
 			.setQueueCount( 1 )
@@ -121,8 +112,6 @@ namespace VkUtil {
 
 		deviceCreateInfo.setQueueCreateInfos( queueCreateInfo );
 		deviceCreateInfo.setEnabledLayerCount( 0 );
-
-	#define LOG_FEATURE(x) printf("\t" #x ": %s\n", x ? "true" : "false");
 
 		vk::PhysicalDeviceVulkan14Features& features14 = featuresChain.get<vk::PhysicalDeviceVulkan14Features>();
 		vk::PhysicalDeviceVulkan13Features& features13 = featuresChain.get<vk::PhysicalDeviceVulkan13Features>();
@@ -133,13 +122,10 @@ namespace VkUtil {
 
 		// Implement 1.4 features.
 		features14.maintenance5 = testFeatures14.maintenance5;
-		LOG_FEATURE( features14.maintenance5 );
 
 		// Implement 1.3 features.
 		features13.dynamicRendering = testFeatures13.dynamicRendering;
 		features13.synchronization2 = testFeatures13.synchronization2;
-		LOG_FEATURE( features13.dynamicRendering );
-		LOG_FEATURE( features13.synchronization2 );
 
 		// Implement 1.2 features.
 		features12.shaderFloat16							  = testFeatures12.shaderFloat16;
@@ -152,29 +138,14 @@ namespace VkUtil {
 		features12.descriptorBindingPartiallyBound			  = testFeatures12.descriptorBindingPartiallyBound;
 		features12.bufferDeviceAddress						  = testFeatures12.bufferDeviceAddress;
 
-		LOG_FEATURE( features12.shaderFloat16 );
-		LOG_FEATURE( features12.descriptorIndexing );
-		LOG_FEATURE( features12.shaderSampledImageArrayNonUniformIndexing );
-		LOG_FEATURE( features12.shaderStorageBufferArrayNonUniformIndexing );
-		LOG_FEATURE( features12.shaderUniformBufferArrayNonUniformIndexing );
-		LOG_FEATURE( features12.runtimeDescriptorArray );
-		LOG_FEATURE( features12.descriptorBindingVariableDescriptorCount );
-		LOG_FEATURE( features12.descriptorBindingPartiallyBound );
-		LOG_FEATURE( features12.bufferDeviceAddress );
-
 		// Implement 1.1 features.
-		features11.shaderDrawParameters = true;
-		LOG_FEATURE( features11.shaderDrawParameters );
+		features11.shaderDrawParameters = vk::True;
 
 		// Implement RayQuery features.		
-		featuresRayQuery.rayQuery = true;
-		LOG_FEATURE( featuresRayQuery.rayQuery );
+		featuresRayQuery.rayQuery = vk::True;
 
 		// Implement AccelerationStructure features.
-		featuresAccelerationStructure.accelerationStructure = true;
-		LOG_FEATURE( featuresAccelerationStructure.accelerationStructure );
-
-		// deviceCreateInfo.setPNext( &featuresChain );
+		featuresAccelerationStructure.accelerationStructure = vk::True;
 		
 		return physicalDevice.createDevice( deviceCreateInfo, nullptr );
 	}
@@ -202,25 +173,6 @@ namespace VkUtil {
 		return uint32_t( wantedExtensions.size() ) == foundExts;
 	}
 
-	vk::Format PhysicalDeviceFindDepthFormat( const vk::PhysicalDevice& physicalDevice ) {
-		std::array<vk::Format, 3> wantedFormats = { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint };
-
-		vk::ImageTiling tiling = vk::ImageTiling::eOptimal;
-		vk::FormatFeatureFlags features = vk::FormatFeatureFlagBits::eDepthStencilAttachment;
-
-		for ( vk::Format format : wantedFormats ) {
-			vk::FormatProperties props = physicalDevice.getFormatProperties( format );
-
-			if ( tiling == vk::ImageTiling::eLinear && ( props.linearTilingFeatures & features ) == features ) {
-				return format;
-			} else if ( tiling == vk::ImageTiling::eOptimal && ( props.optimalTilingFeatures & features ) == features ) {
-				return format;
-			}
-		}
-
-		return vk::Format::eD32Sfloat;
-	}
-
 	uint32_t FindQueueFamilyIndex( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice ) {
 		std::vector<vk::QueueFamilyProperties> queueFamilies = physicalDevice.getQueueFamilyProperties();
 		for ( size_t i = 0; i < queueFamilies.size(); i++ ) {
@@ -234,30 +186,18 @@ namespace VkUtil {
 		return vk::QueueFamilyIgnored;
 	}
 
-	SwapchainSupportData QuerySwapchainSupport( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice ) {
-		SwapchainSupportData out{};
-
-		out.m_SurfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR( surface );
-		out.m_SurfaceFormats = physicalDevice.getSurfaceFormatsKHR( surface );
-		out.m_PresentModes = physicalDevice.getSurfacePresentModesKHR( surface );
-
-		return out;
-	}
-
 	vk::SwapchainKHR CreateSwapchain( const vk::Device& device, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const HWND& windowHandle, vk::Extent2D& outExtents, vk::Format& outImageFormat ) {
-		const auto& swapChainSupport = QuerySwapchainSupport( surface, physicalDevice );
-		if ( swapChainSupport.m_PresentModes.empty() || swapChainSupport.m_SurfaceFormats.empty() ) {
-			printf( "Device does not have any present modes or surface formats\n" );
-			return VK_NULL_HANDLE;
-		}
+		vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR( surface );
+		std::vector<vk::SurfaceFormatKHR> surfaceFormats = physicalDevice.getSurfaceFormatsKHR( surface );
+		std::vector<vk::PresentModeKHR> presentModes = physicalDevice.getSurfacePresentModesKHR( surface );
 
-		vk::SurfaceFormatKHR surfaceFormat = SwapchainSelectSurfaceFormat( swapChainSupport.m_SurfaceFormats );
-		vk::PresentModeKHR presentMode = SwapchainSelectPresentMode( swapChainSupport.m_PresentModes );
-		vk::Extent2D extent = SwapchainGetExtents( windowHandle, swapChainSupport.m_SurfaceCapabilities );
+		vk::SurfaceFormatKHR surfaceFormat = SwapchainSelectSurfaceFormat( surfaceFormats );
+		vk::PresentModeKHR presentMode = SwapchainSelectPresentMode( presentModes );
+		vk::Extent2D extent = SwapchainGetExtents( windowHandle, surfaceCapabilities );
 
-		uint32_t imageCount = swapChainSupport.m_SurfaceCapabilities.minImageCount + 1;
-		if ( swapChainSupport.m_SurfaceCapabilities.maxImageCount > 0 && imageCount > swapChainSupport.m_SurfaceCapabilities.maxImageCount ) {
-			imageCount = swapChainSupport.m_SurfaceCapabilities.maxImageCount;
+		uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
+		if ( surfaceCapabilities.maxImageCount > 0 && imageCount > surfaceCapabilities.maxImageCount ) {
+			imageCount = surfaceCapabilities.maxImageCount;
 		}
 
 		vk::SwapchainCreateInfoKHR swapchainCreateInfo = {};
@@ -270,7 +210,7 @@ namespace VkUtil {
 			.setImageUsage( vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled )
 			.setImageSharingMode( vk::SharingMode::eExclusive );
 
-		swapchainCreateInfo.setPreTransform( swapChainSupport.m_SurfaceCapabilities.currentTransform )
+		swapchainCreateInfo.setPreTransform( surfaceCapabilities.currentTransform )
 			.setCompositeAlpha( vk::CompositeAlphaFlagBitsKHR::eOpaque )
 			.setPresentMode( presentMode )
 			.setClipped( VK_TRUE );
@@ -317,28 +257,6 @@ namespace VkUtil {
 			actualExtent.height = std::clamp( actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height );
 
 			return actualExtent;
-		}
-	}
-
-	vk::ImageView CreateImageView( const vk::Device& device, const vk::Image& image, vk::ImageViewCreateInfo& createInfo ) {
-		// TODO: Maybe stop doing this?
-		createInfo.image = image;
-		return device.createImageView( createInfo );
-	}
-
-	void CreateSwapchainImages( const vk::Device& device, const vk::SwapchainKHR& swapchain, const vk::Format imageFormat, std::vector<vk::Image>& outImages, std::vector<vk::ImageView>& outImageViews ) {
-		outImages = device.getSwapchainImagesKHR(swapchain);
-		outImageViews.resize( outImages.size() );
-
-		for ( size_t i = 0; i < outImageViews.size(); i++ ) {
-			vk::ImageViewCreateInfo imageViewCreateInfo = {};
-			vk::ImageSubresourceRange subresourceRange( vk::ImageAspectFlagBits::eColor, 0, vk::RemainingMipLevels, 0,vk::RemainingArrayLayers );
-
-			imageViewCreateInfo.setViewType( vk::ImageViewType::e2D )
-				.setFormat( imageFormat )
-				.setSubresourceRange( subresourceRange );
-
-			outImageViews[ i ] = CreateImageView( device, outImages[ i ], imageViewCreateInfo );
 		}
 	}
 

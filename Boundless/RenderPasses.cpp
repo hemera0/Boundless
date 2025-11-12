@@ -40,35 +40,37 @@ namespace Boundless {
 
 		auto& registry = scene.GetRegistry();
 
-		for ( entt::entity entity : registry.group<Mesh>() ) {
+		for ( entt::entity entity : registry.view<Mesh>() ) {
 			const Mesh& mesh = registry.get<Mesh>( entity );
-			if(mesh.m_Indices.empty())
+			if ( mesh.m_Indices.empty() )
 				continue;
 
-			// TODO: Make transforms not optional... They should be the first component on every entity.
-			glm::mat4 modelMatrix( 1.f );
+			if ( !registry.all_of<Transform>( entity ) )
+				continue;
 
-			// if ( Transform* transform = registry.try_get<Transform>( entity ) ) {
-			// 	modelMatrix = transform->GetWorldTransform();
-			// }
-			
-			vk::DeviceAddress sceneUniforms  = device.GetBuffer( frameConstantsBuffer ).GetDeviceAddress();
+			vk::DeviceAddress vertexBuffer = device.GetBuffer( mesh.m_VertexBuffer ).GetDeviceAddress();
+			if ( mesh.m_SkinnedVertexBuffer != BufferHandle::Invalid ) {
+				vertexBuffer = device.GetBuffer( mesh.m_SkinnedVertexBuffer ).GetDeviceAddress();
+			}
+
+			Transform& transform = registry.get<Transform>( entity );
+			glm::mat4 worldTransform = transform.m_WorldTransform;
+
+			vk::DeviceAddress frameConstants = device.GetBuffer( frameConstantsBuffer ).GetDeviceAddress();
 			vk::DeviceAddress sceneMaterials = device.GetBuffer( scene.GetMaterialBuffer() ).GetDeviceAddress();
-			vk::DeviceAddress vertexBuffer   = device.GetBuffer( mesh.m_VertexBuffer ).GetDeviceAddress();
-			uint32_t materialIndex		   = mesh.m_Material;
+			uint32_t materialIndex		     = mesh.m_Material;
 
 			GBufferPushConstants pc = {
-				sceneUniforms,
-				sceneMaterials,
-				vertexBuffer,
-				materialIndex
+				.m_FrameConstantsBuffer = frameConstants,
+				.m_MaterialsBuffer		= sceneMaterials,
+				.m_VertexBuffer			= vertexBuffer,
+				.m_WorldTransform		= worldTransform,
+				.m_MaterialIndex		= materialIndex,
 			};
-
-			commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
 
 			Buffer& indexBuffer = device.GetBuffer( mesh.m_IndexBuffer );
 			commandBuffer.BindIndexBuffer( indexBuffer );
-			
+			commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
 			commandBuffer->drawIndexed( uint32_t( mesh.m_Indices.size() ), 1, 0, 0, 0 );
 		}
 
@@ -232,7 +234,7 @@ namespace Boundless {
 	// -------------
 	// Skinning Pass
 	// -------------
-	SkinningPass::SkinningPass( const Viewport& viewport ) : BaseRenderPass( viewport, "Skinning Pass" ) {}
+	SkinningPass::SkinningPass( ) : BaseRenderPass( Viewport(), "Skinning Pass" ) {}
 	
 	void SkinningPass::CreatePassResources( Device& device ) { 
 		 m_Pipeline = m_ComputePipelineBuilder.SetPipelineLayout( device.GetGlobalPipelineLayout() )
@@ -241,6 +243,38 @@ namespace Boundless {
 	}
 
 	void SkinningPass::Dispatch( CommandBuffer& commandBuffer, Device& device, Scene& scene ) { 
+		auto& registry = scene.GetRegistry();
 
+		auto view = registry.view<Mesh>();
+		for( auto [ entity, mesh ] : view.each() ) {
+			if ( !registry.valid( mesh.m_Skeleton ) || !registry.all_of<Skeleton>( mesh.m_Skeleton ) )
+				continue;
+
+			Skeleton& skeleton = registry.get<Skeleton>( mesh.m_Skeleton );
+
+			// Upload bone matrix data.
+			Buffer& boneMatrixBuffer = device.GetBuffer( skeleton.m_BoneTransformsBuffer );
+
+			glm::mat4* boneMatricesData = skeleton.m_BoneTransformMatrices.data();
+			size_t boneMatricesSize = skeleton.m_BoneTransformMatrices.size() * sizeof( glm::mat4 );
+
+			std::unique_ptr<StagingBuffer> stagingBuffer = device.CreateStagingBuffer( boneMatricesSize );
+			stagingBuffer->Patch( boneMatricesData, boneMatricesSize );
+
+			commandBuffer.CopyBuffer( *stagingBuffer, boneMatrixBuffer, boneMatricesSize );
+
+			SkinningPushConstants pc = {
+				.m_VertexBuffer = device.GetBuffer( mesh.m_VertexBuffer ).GetDeviceAddress(),
+				.m_SkinnedVertexBuffer = device.GetBuffer( mesh.m_SkinnedVertexBuffer ).GetDeviceAddress(),
+				.m_BoneIndicesBuffer = device.GetBuffer( mesh.m_BoneIndexBuffer ).GetDeviceAddress(),
+				.m_BoneWeightsBuffer = device.GetBuffer( mesh.m_BoneWeightBuffer ).GetDeviceAddress(),
+				.m_BoneTransformsBuffer = device.GetBuffer( skeleton.m_BoneTransformsBuffer ).GetDeviceAddress(),
+				.m_VertexCount = uint32_t( mesh.m_Positions.size() ),
+			};
+			
+			commandBuffer.BindComputePipeline( m_Pipeline );
+			commandBuffer.BindPushConstants( device, &pc, sizeof( pc ) );
+			commandBuffer->dispatch( uint32_t( mesh.m_Positions.size() + 63  / 64 ), 1, 1 );
+		}
 	}
 }

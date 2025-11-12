@@ -38,23 +38,23 @@ float4 main(FullScreenPSInput input) : SV_Target0 {
 	material.LoadData(albedo.rgb, normal, metallicRoughness.x, metallicRoughness.y);
 	
 	float3 wi = normalize(-scene.SunDirection.xyz);
-    float3 wo = normalize(scene.CameraPosition.xyz - worldPos.xyz);
+    float3 wo = normalize(scene.CameraPosition.xyz - worldPos);
     float3 radiance = emissive.rgb;
 
     // Rayquery shadows.
-	// RayDesc ray;
-    // ray.TMin = 0.01f;
-    // ray.TMax = 1000.0;
-    // ray.Origin = worldPos.xyz;	
-    // ray.Direction = wi;
+	RayDesc ray;
+    ray.TMin = 0.01f;
+    ray.TMax = 1000.0;
+    ray.Origin = worldPos;
+    ray.Direction = wi;
 
-    // uint rayFlags = RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
-    // RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> query;
+    uint rayFlags = RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
 
-    // query.TraceRayInline(TLAS, rayFlags, 0xFF, ray);
-    // query.Proceed();
+    RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> query;
+    query.TraceRayInline(TLAS, rayFlags, 0xFF, ray);
+    query.Proceed();
 
-	bool hit = false; // query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+	bool hit = query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
 
     // Directional Light 
     radiance += material.CalculateDirectionalLight(wi, wo, scene.SunColor.rgb, hit);

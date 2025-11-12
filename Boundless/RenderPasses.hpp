@@ -4,10 +4,12 @@
 #include "BaseRenderPass.hpp"
 
 namespace Boundless {
-	struct GBufferPushConstants {
+	struct alignas( 16 ) GBufferPushConstants {
 		vk::DeviceAddress m_FrameConstantsBuffer;
 		vk::DeviceAddress m_MaterialsBuffer;
 		vk::DeviceAddress m_VertexBuffer;
+		uint8_t           m_Pad0[8];
+		glm::mat4		  m_WorldTransform;
 		uint32_t		  m_MaterialIndex;
 	};
 
@@ -96,7 +98,7 @@ namespace Boundless {
 
 	class SkinningPass : public BaseRenderPass {
 	public:
-		SkinningPass( const Viewport& viewport );
+		SkinningPass(  );
 
 		virtual void CreatePassResources( Device& device ) override;
 		void Dispatch( CommandBuffer& commandBuffer, Device& device, Scene& scene );

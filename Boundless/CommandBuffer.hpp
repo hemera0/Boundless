@@ -34,6 +34,8 @@ namespace Boundless {
 
 		void BindDefaults( Device& device );
 		void BindPipeline( const vk::Pipeline& pipeline );
+		void BindComputePipeline( const vk::Pipeline& pipeline );
+
 		void BindIndexBuffer( Buffer& buffer, vk::IndexType indexType = vk::IndexType::eUint32 );
 		void BindPushConstants( Device& device, void* value, size_t size );
 	private:

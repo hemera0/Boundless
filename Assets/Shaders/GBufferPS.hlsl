@@ -13,22 +13,24 @@ PUSH_CONSTANTS(GBufferPushConstants, pc);
 TEXTURE_POOL()
 
 float4 main(PS_Input input) : SV_Target0 {
-    Material mat = pc.Materials.Get()[pc.MaterialIndex];
+	uint materialIndex = pc.MaterialIndex; // [0];
+
+    Material mat = pc.Materials.Get()[materialIndex];
 	SceneData scene = pc.Scene.Get();
 
     float4 albedo = mat.Albedo;    
-    if(mat.AlbedoTexture)
+    if(mat.AlbedoTexture > -1)
         albedo *= TEXTURE_SAMPLE2D(mat.AlbedoTexture, SAMPLER_ANISO_WRAP, input.UV);
 
     if(albedo.a < mat.AlphaCutoff)
         discard;
 
     float4 emissive = mat.Emissive;
-    if(mat.EmissiveTexture)
+    if(mat.EmissiveTexture > -1)
         emissive *= TEXTURE_SAMPLE2D(mat.EmissiveTexture, SAMPLER_ANISO_WRAP, input.UV);
 
 	float3 normal = normalize(input.Normal);
-	if(mat.NormalsTexture) {
+	if(mat.NormalsTexture > -1) {
 		float3 nmap = TEXTURE_SAMPLE2D(mat.NormalsTexture, SAMPLER_ANISO_WRAP, input.UV).rgb * 2.f - 1.f;
 
 		float3 tangent = normalize(input.Tangent.xyz);
@@ -40,7 +42,7 @@ float4 main(PS_Input input) : SV_Target0 {
 
 	float metallic = 0.f;
 	float roughness = 1.f;
-	if(mat.MetalRoughnessTexture) {
+	if(mat.MetalRoughnessTexture > -1) {
 		float3 mr = TEXTURE_SAMPLE2D(mat.MetalRoughnessTexture, SAMPLER_ANISO_WRAP, input.UV).rgb;
 		metallic = mr.b * mat.MetallicFactor;
 		roughness = mr.g * mat.RoughnessFactor;

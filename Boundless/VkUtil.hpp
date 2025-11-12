@@ -13,36 +13,23 @@ struct Viewport {
 	vk::Extent2D Size;
 };
 
-namespace VkUtil {
-	struct SwapchainSupportData {
-		vk::SurfaceCapabilitiesKHR		  m_SurfaceCapabilities = {};
-		std::vector<vk::SurfaceFormatKHR> m_SurfaceFormats;
-		std::vector<vk::PresentModeKHR>	  m_PresentModes;
-	};
-
+namespace vk_util {
 	vk::Instance CreateInstance( const char** requiredExtensions, const int requiredExtensionsCount );
 	vk::PhysicalDevice GetPhysicalDevice( const vk::Instance& instance, const std::vector<const char*>& wantedExtensions );
 	vk::Device CreateLogicalDevice( const vk::Instance& instance, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const std::vector<const char*>& wantedExtensions );
-
 	vk::SurfaceKHR CreateSurfaceForWindow( const vk::Instance& instance, const HWND& hwnd );
 
 	// Physical Device Helpers...
 	bool PhysicalDeviceHasExtensions( const vk::PhysicalDevice& physicalDevice, const std::vector<const char*>& wantedExtensions );
-	vk::Format PhysicalDeviceFindDepthFormat(const vk::PhysicalDevice& physicalDevice );
 
 	// Surface & Physical Device Helpers...
 	uint32_t FindQueueFamilyIndex( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice );
-	SwapchainSupportData QuerySwapchainSupport( const vk::SurfaceKHR& surface, const vk::PhysicalDevice& physicalDevice );
 
 	// Swapchain Helpers...
 	vk::SwapchainKHR CreateSwapchain( const vk::Device& device, const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surface, const HWND& windowHandle, vk::Extent2D& outExtents, vk::Format& outImageFormat );
 	vk::SurfaceFormatKHR SwapchainSelectSurfaceFormat( const std::vector<vk::SurfaceFormatKHR>& availableFormats );
 	vk::PresentModeKHR SwapchainSelectPresentMode( const std::vector<vk::PresentModeKHR>& availableModes );
 	vk::Extent2D SwapchainGetExtents( const HWND& windowHandle, const vk::SurfaceCapabilitiesKHR& capabilities );
-
-	void CreateSwapchainImages( const vk::Device& device, const vk::SwapchainKHR& swapchain, const vk::Format imageFormat, std::vector<vk::Image>& outImages, std::vector<vk::ImageView>& outImageViews );
-
-	vk::ImageView CreateImageView( const vk::Device& device, const vk::Image& image, vk::ImageViewCreateInfo& createInfo );
 
 	// Render Pass Helpers...
 	vk::RenderingAttachmentInfo RenderPassGetColorAttachmentInfo( const vk::ImageView& view, vk::ClearValue* clear, vk::ImageLayout layout, vk::ResolveModeFlagBits resolveMode = vk::ResolveModeFlagBits::eNone, const vk::ImageView& resolveImage = VK_NULL_HANDLE, vk::ImageLayout resolveLayout = vk::ImageLayout::eUndefined );

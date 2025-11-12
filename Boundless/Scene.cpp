@@ -5,15 +5,17 @@
 namespace Boundless {
 	Scene::Scene() { 
 		m_RootEntity = m_Registry.create();
-		m_Registry.emplace<Transform>(m_RootEntity);
-		m_Registry.emplace<EntityRelation>(m_RootEntity);
+		m_Registry.emplace<Transform>( m_RootEntity );
+		m_Registry.emplace<EntityRelation>( m_RootEntity );
+		m_Registry.emplace<EntityTag>( m_RootEntity, "Root Entity" );
 	}
 
-	void Scene::OnDeviceStart( Device& device ) { 
+	void Scene::UploadToGPU( Device& device ) { 
 		UploadMeshes( device );
 		UploadTLAS( device );
 		UploadTextures( device );
 		UploadMaterials( device );
+		UploadSkeletons( device );
 	}
 	
 	void Scene::UploadMeshes( Device& device ) { 
@@ -37,6 +39,59 @@ namespace Boundless {
 						.m_Usage = vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress,
 						.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
 					}
+				);
+			}
+
+			if ( !mesh.m_BoneIndices.empty() ) {
+				mesh.m_BoneIndexBuffer = device.CreateBuffer( Buffer::Desc{
+						.m_Size = uint32_t( mesh.m_BoneIndices.size() * sizeof( glm::uvec4 ) ),
+						.m_Usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+						.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+					} 
+				);
+
+				Buffer& boneIndexBuffer = device.GetBuffer( mesh.m_BoneIndexBuffer );
+
+				size_t bufferSize = mesh.m_BoneIndices.size() * sizeof( glm::uvec4 );
+				std::unique_ptr<StagingBuffer> stagingBuffer = device.CreateStagingBuffer( bufferSize );
+				stagingBuffer->Patch( mesh.m_BoneIndices.data(), bufferSize );
+
+				// TOOD: fix mem leak.
+				CommandBuffer commandBuffer = CommandBuffer( device );
+				commandBuffer.Begin( vk::CommandBufferUsageFlagBits::eOneTimeSubmit );
+				commandBuffer.CopyBuffer( *stagingBuffer, boneIndexBuffer, bufferSize );
+				commandBuffer.End();
+				commandBuffer.Submit( device.GetQueue() );
+			}
+
+			if ( !mesh.m_BoneWeights.empty() ) {
+				mesh.m_BoneWeightBuffer = device.CreateBuffer( Buffer::Desc{
+						.m_Size = uint32_t( mesh.m_BoneWeights.size() * sizeof( glm::vec4 ) ),
+						.m_Usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+						.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+					} 
+				);
+
+				Buffer& boneWeightsBuffer = device.GetBuffer( mesh.m_BoneWeightBuffer );
+
+				size_t bufferSize = mesh.m_BoneWeights.size() * sizeof( glm::vec4 );
+				std::unique_ptr<StagingBuffer> stagingBuffer = device.CreateStagingBuffer( bufferSize );
+				stagingBuffer->Patch( mesh.m_BoneWeights.data(), bufferSize );
+
+				// TOOD: fix mem leak.
+				CommandBuffer commandBuffer = CommandBuffer( device );
+				commandBuffer.Begin( vk::CommandBufferUsageFlagBits::eOneTimeSubmit );
+				commandBuffer.CopyBuffer( *stagingBuffer, boneWeightsBuffer, bufferSize );
+				commandBuffer.End();
+				commandBuffer.Submit( device.GetQueue() );
+			}
+
+			if ( !mesh.m_BoneWeights.empty() && !mesh.m_BoneIndices.empty() ) {
+				mesh.m_SkinnedVertexBuffer = device.CreateBuffer( Buffer::Desc{
+						.m_Size = mesh.m_Vertices.size() * sizeof( MeshVertexData ),
+						.m_Usage = vk::BufferUsageFlagBits::eShaderDeviceAddress,
+						.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+					} 
 				);
 			}
 
@@ -144,6 +199,7 @@ namespace Boundless {
 		}
 	}
 
+	// TODO: Update blas for animations & Fix the transforms.
 	void Scene::UploadTLAS( Device& device ) {
 		uint32_t totalPrimitiveCount = 0;
 
@@ -268,7 +324,7 @@ namespace Boundless {
 		write.descriptorCount = 1;
 		write.dstArrayElement = 0;
 
-		device->updateDescriptorSets( { write }, {} );
+		device->updateDescriptorSets( write, {} );
 	}
 	
 	void Scene::UploadTextures( Device& device ) { 
@@ -315,6 +371,7 @@ namespace Boundless {
 			materials.push_back( gpuMat );
 		}
 
+		// TODO: This really needs to be fixed. Materials are breaking when loading more than 1 gltf file.
 		// TODO: Fix ghettoness of this (It's not terrible since it will only happen on scene load basically but.
 		std::sort( materials.begin(), materials.end(), [ & ]( const auto& a, const auto& b ) -> bool
 		{
@@ -342,24 +399,102 @@ namespace Boundless {
 		commandBuffer.Submit( device.GetQueue() );
 	}
 
-	void Scene::UpdateTransformsRecursive( entt::entity entity ) {
-		const auto& relation = m_Registry.get<EntityRelation>( entity );
-		const auto  parent = GetParent( entity );
+	void Scene::UploadSkeletons( Device& device ) { 
+		auto view = m_Registry.view<Mesh>();
+		for ( auto [entity, mesh] : view.each() ) {
+			if ( !m_Registry.valid( mesh.m_Skeleton ) || !m_Registry.all_of<Skeleton>( mesh.m_Skeleton ) )
+				continue;
 
-		auto& transform = m_Registry.get<Transform>( entity );
-		if ( parent == entt::null || parent == m_RootEntity ) {
-			transform.m_WorldTransform = transform.m_LocalTransform;
-		} else {
-			const Transform& parentTransform = m_Registry.get<Transform>( parent );
-			transform.m_WorldTransform = parentTransform.m_WorldTransform * transform.m_LocalTransform;
+			Skeleton& skeleton = m_Registry.get<Skeleton>( mesh.m_Skeleton );
+
+			skeleton.m_BoneTransformMatrices.resize( skeleton.m_InverseBindMatrices.size(), glm::mat4( 1.0f ) );
+			skeleton.m_BoneWSTransformMatrices.resize( skeleton.m_InverseBindMatrices.size(), glm::mat4( 1.0f ) );
+
+			skeleton.m_BoneTransformsBuffer = device.CreateBuffer( Buffer::Desc{
+					.m_Size = uint32_t( skeleton.m_BoneTransformMatrices.size() * sizeof( glm::mat4 ) ),
+					.m_Usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+					.m_MemoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+				} );
+		}
+	}
+
+	void PrintEntityName( Scene& scene, entt::entity entity, std::string& tabs ) {
+		auto& registry = scene.GetRegistry();
+
+		const auto& relation = registry.get<EntityRelation>( entity );
+		const auto& name = registry.get<EntityTag>( entity );
+
+		printf( "%s%s\n", tabs.data(), name.m_Name.data() );
+
+		for ( entt::entity child : relation.m_Children )
+			PrintEntityName( scene, child, tabs );
+
+		printf("-------------\n");
+
+		tabs += ' ';
+	}
+
+	void PrintEntityHierarchy( Scene& scene, entt::entity entity, const std::string& tabs ) {
+		auto& registry = scene.GetRegistry();
+
+		std::string name = registry.all_of<EntityTag>(entity) ? registry.get<EntityTag>( entity ).m_Name : "Unnamed";
+	
+		printf("%s%s[%d]\n", tabs.data(), name.data(), int( entity ));
+
+		const auto& relation = registry.get<EntityRelation>( entity );
+		for ( entt::entity child : relation.m_Children ) {
+			PrintEntityHierarchy( scene, child, tabs + " " );
+		}
+	}
+
+	// TODO: Finish/fix some issues with this (Skeletal mesh doesn't match correct rest pose)
+	void Scene::UpdateTransformsRecursive( entt::entity entity, const glm::mat4& parentTransform ) {
+		const auto& relation = m_Registry.get<EntityRelation>( entity );
+		
+		glm::mat4 childTransform = parentTransform;
+
+		if( Transform* transform = m_Registry.try_get<Transform>( entity ) ) {
+			transform->m_WorldTransform = parentTransform * transform->m_LocalTransform;
+			childTransform = transform->m_WorldTransform;
 		}
 
 		for ( entt::entity child : relation.m_Children )
-			UpdateTransformsRecursive( child );
+			UpdateTransformsRecursive( child, childTransform );
 	}
 
 	void Scene::UpdateTransforms() { 
-		UpdateTransformsRecursive(m_RootEntity);
+		UpdateTransformsRecursive(m_RootEntity, glm::mat4(1.f));
+	}
+
+	void Scene::UpdateAnimations( float deltaTime ) {
+		entt::entity firstAnimation = entt::null;
+
+		// TODO: Remove this
+		static bool animate = false;
+		if ( GetAsyncKeyState( VK_F2 ) & 1 )
+			animate = !animate;
+
+		for( entt::entity entity : m_Registry.view<Animation>() ) {
+			Animation& animation = m_Registry.get<Animation>( entity );
+			animation.Update( deltaTime );
+		
+			if ( firstAnimation == entt::null )
+				firstAnimation = entity;
+		}
+
+		for ( entt::entity entity : m_Registry.view<Skeleton>() ) {
+			Skeleton& skeleton = m_Registry.get<Skeleton>( entity );
+
+			if ( animate )
+				skeleton.m_Animation = firstAnimation;
+			else
+				skeleton.m_Animation = entt::null;
+
+			if ( m_Registry.valid( skeleton.m_Animation ) && m_Registry.all_of<Animation>( skeleton.m_Animation ) ) {
+				const Animation& animation = m_Registry.get<Animation>( skeleton.m_Animation );
+				skeleton.UpdateFromAnimation( animation );
+			}
+		}
 	}
 
 	entt::entity Scene::GetParent( entt::entity entity ) {
@@ -368,22 +503,42 @@ namespace Boundless {
 
 	void Scene::ParentTo( entt::entity entity, entt::entity parent ) { 
 		EntityRelation& rel = m_Registry.get<EntityRelation>(entity);
-		if(rel.m_Parent == parent)
+		if( rel.m_Parent == parent )
 			return;
+
+		if ( rel.m_Parent != entt::null ) {
+			EntityRelation& oldParentRel = m_Registry.get<EntityRelation>( rel.m_Parent );
+			auto& children = oldParentRel.m_Children;
+			children.erase( std::remove( children.begin(), children.end(), entity ), children.end() );
+		}
 
 		rel.m_Parent = parent;
 
-		EntityRelation& parentRel = m_Registry.get<EntityRelation>(parent);
-		parentRel.m_Children.push_back(entity);
+		auto& parentRel = m_Registry.get<EntityRelation>( parent );
+		if ( std::find( parentRel.m_Children.begin(), parentRel.m_Children.end(), entity ) == parentRel.m_Children.end() ) {
+			parentRel.m_Children.push_back( entity );
+		}
 	}
 
-	entt::entity Scene::CreateGameObject() {
+	entt::entity Scene::CreatedNamedEntity( const std::string& name ) {
 		entt::entity ent = m_Registry.create();
 
-		m_Registry.emplace<Transform>(ent);
-		m_Registry.emplace<EntityRelation>(ent);
+		m_Registry.emplace<EntityRelation>( ent );
+		m_Registry.emplace<EntityTag>( ent, name );
 
 		ParentTo( ent, m_RootEntity );
+		return ent;
+	}
+
+	entt::entity Scene::CreateEntityWithTransform( const std::string& name ) {
+		entt::entity ent = m_Registry.create();
+
+		m_Registry.emplace<Transform>( ent );
+		m_Registry.emplace<EntityRelation>( ent );
+		m_Registry.emplace<EntityTag>( ent, name );
+
+		ParentTo( ent, m_RootEntity );
+		
 		return ent;
 	}
 }

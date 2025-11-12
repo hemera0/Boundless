@@ -19,7 +19,6 @@
 
 #include <entt/entt.hpp>
 
-// #include <volk/volk.h>
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
@@ -32,7 +31,6 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <tinyobjloader/tiny_obj_loader.h>
 #include <tinygltf/tiny_gltf.h>
 
 // TODO: add more stl aliases/utilities 

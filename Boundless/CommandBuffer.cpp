@@ -134,6 +134,10 @@ namespace Boundless {
 		m_CommandBuffer.bindPipeline( vk::PipelineBindPoint::eGraphics, pipeline );
 	}
 
+	void CommandBuffer::BindComputePipeline( const vk::Pipeline& pipeline ) { 
+		m_CommandBuffer.bindPipeline( vk::PipelineBindPoint::eCompute, pipeline );
+	}
+
 	void CommandBuffer::BindIndexBuffer( Buffer& buffer, vk::IndexType indexType ) {
 		m_CommandBuffer.bindIndexBuffer( buffer, 0, indexType );
 	}

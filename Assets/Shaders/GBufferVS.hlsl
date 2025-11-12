@@ -15,13 +15,14 @@ VS_Output main(uint VertexIndex : SV_VertexID) {
     SceneData scene = pc.Scene.Get();
 
     VS_Output res;
-    res.Position = float4(vertex.Position.xyz, 1.f);
-    // res.Position = mul(PushConstants.ModelMatrix, res.Position);
+    res.Position = mul(pc.WorldTransform, float4(vertex.Position.xyz, 1.f));
     res.WorldPos = res.Position;
-    
-    res.Tangent = vertex.Tangent;
+
+    float3 normal = normalize(vertex.Normal.xyz);
+    res.Tangent  = mul(pc.WorldTransform, vertex.Tangent);
+    res.Normal   = mul(pc.WorldTransform, float4(normal, 0.f));
+
     res.Position = mul(scene.CameraViewProjectionMatrix, res.Position);
-    res.Normal = normalize(vertex.Normal.xyz);
     res.UV = float2(vertex.UVx, vertex.UVy);
 
     return res;

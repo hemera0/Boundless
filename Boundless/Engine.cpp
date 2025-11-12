@@ -1,7 +1,6 @@
 #include "Pch.hpp"
 #include "Engine.hpp"
 
-#include "OBJImporter.hpp"
 #include "GLTFImporter.hpp"
 
 #include "Device.hpp"
@@ -38,6 +37,7 @@ namespace Boundless {
 
 		for ( auto i = 0; i < MaxFramesInFlight; i++ ) {
 			FrameData& fd = m_FrameData[ i ];			
+			
 			fd.m_CommandPool			 = device.createCommandPool( vk::CommandPoolCreateInfo{ vk::CommandPoolCreateFlagBits::eResetCommandBuffer, m_Device->GetQueueIndex() } );
 			fd.m_CommandBuffer			 = CommandBuffer( *m_Device, fd.m_CommandPool );
 			fd.m_ImageAvailableSemaphore = device.createSemaphore( semaphoreCreateInfo );
@@ -57,9 +57,6 @@ namespace Boundless {
 			}
 		);
 
-		// m_ComputeFinishedSemaphore = device.createSemaphore( semaphoreCreateInfo );
-		// m_ComputeInFlightFence = device.createFence( fenceCreateInfo );
-
 		m_FullscreenPipeline = PipelineBuilder{}
 			.SetShaderBlobs( { { g_EngineShaders.FullscreenBlitPixelShader, vk::ShaderStageFlagBits::eFragment }, { g_EngineShaders.FullscreenTriVertexShader, vk::ShaderStageFlagBits::eVertex } } )
 			.SetColorAttachmentFormats( m_SwapchainImageFormat )
@@ -72,18 +69,28 @@ namespace Boundless {
 
 		m_Scene.SetMainCamera( defaultCamera );
 
-		GLTFImporter gltf( m_Scene );
-		if(!gltf.LoadFromFile("..\\Assets\\Models\\Sponza\\Sponza.gltf")) {
-			printf("Failed to load gltf file\n");
-			return;
+		{
+			 //GLTFImporter gltf( m_Scene );
+			 //if(!gltf.LoadFromFile("..\\Assets\\Models\\Sponza\\Sponza.gltf")) {
+			 //	printf("Failed to load gltf file\n");
+			 //	return;
+			 //}
 		}
 
+		{
+			GLTFImporter gltf( m_Scene );
+			if ( !gltf.LoadFromFile( "..\\Assets\\Models\\TwistDance\\Dance.gltf" ) ) {
+				printf( "Failed to load gltf file\n" );
+				return;
+			}
+		}
+		
 		// TODO: move?
 		m_DiffuseIbl  = m_Device->LoadKTXImageFromFile( "..\\Assets\\IBL\\Inside\\diffuse.ktx2" ).first;
 		m_SpecularIbl = m_Device->LoadKTXImageFromFile( "..\\Assets\\IBL\\Inside\\specular.ktx2" ).first;
 		GenerateBrdfLut();
 
-		m_Scene.OnDeviceStart(*m_Device);
+		m_Scene.UploadToGPU(*m_Device);
 
 		RecompilePasses();
 	}
@@ -123,12 +130,14 @@ namespace Boundless {
 		for ( BaseRenderPass* renderPass : m_RenderPasses )
 			renderPass->ReleasePassResources( *m_Device );
 
+		m_Skinning	   = std::make_unique<SkinningPass>();
 		m_GBuffer	   = std::make_unique<GBufferPass>( viewport );
 		m_GBufferDebug = std::make_unique<GBufferDebugPass>( viewport );
 		m_Lighting	   = std::make_unique<LightingPass>( viewport );
 		m_Composite	   = std::make_unique<CompositePass>( viewport );
 
 		m_RenderPasses.clear();
+		m_RenderPasses.push_back( m_Skinning.get() );
 		m_RenderPasses.push_back( m_GBuffer.get() );
 		m_RenderPasses.push_back( m_GBufferDebug.get() );
 		m_RenderPasses.push_back( m_Lighting.get() );
@@ -167,8 +176,8 @@ namespace Boundless {
 		commandBuffer.Begin();
 
 		vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-		vk::RenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( m_Device->GetImage( m_BrdfLut ), &clearValue, vk::ImageLayout::eAttachmentOptimal );
-		vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( VkExtent2D{ lutDim, lutDim }, &colorAttachment, nullptr );
+		vk::RenderingAttachmentInfo colorAttachment = vk_util::RenderPassGetColorAttachmentInfo( m_Device->GetImage( m_BrdfLut ), &clearValue, vk::ImageLayout::eAttachmentOptimal );
+		vk::RenderingInfo renderingInfo = vk_util::RenderPassCreateRenderingInfo( VkExtent2D{ lutDim, lutDim }, &colorAttachment, nullptr );
 
 		commandBuffer.BeginRendering(renderingInfo);
 		commandBuffer.SetScissorAndViewport( m_Device->GetImage( brdfTex ) );
@@ -217,6 +226,8 @@ namespace Boundless {
 		mainCamera.Update( deltaTime );
 
 		m_Scene.UpdateTransforms();
+
+		m_Scene.UpdateAnimations( deltaTime );
 	}
 
 	void Engine::Render( float deltaTime ) {
@@ -269,6 +280,8 @@ namespace Boundless {
 
 			Buffer& frameConstantsBuffer = m_Device->GetBuffer( m_FrameConstantsBuffer );
 			frameConstantsBuffer.Patch( &m_FrameConstants, sizeof( m_FrameConstants ) );
+
+			m_Skinning->Dispatch(commandBuffer, *m_Device, m_Scene );
 
 			// GBuffer.
 			GBufferOutput gbufferOutput = m_GBuffer->Render( commandBuffer, *m_Device, m_FrameConstantsBuffer, m_Scene );
@@ -356,13 +369,26 @@ namespace Boundless {
 	void Engine::OnResize() {
 		const vk::Device& device = m_Device->GetDevice();
 
-		if( m_Swapchain != VK_NULL_HANDLE) {
+		if( m_Swapchain != VK_NULL_HANDLE ) {
 			DestroySwapchain();
 		}
 
-		m_Swapchain = VkUtil::CreateSwapchain( device, m_Device->GetPhysicalDevice(), m_Device->GetSurface(), m_WindowHandle, m_SwapchainExtents, m_SwapchainImageFormat );
+		m_Swapchain = vk_util::CreateSwapchain( device, m_Device->GetPhysicalDevice(), m_Device->GetSurface(), m_WindowHandle, m_SwapchainExtents, m_SwapchainImageFormat );
 
-		VkUtil::CreateSwapchainImages( device, m_Swapchain, m_SwapchainImageFormat, m_SwapchainImages, m_SwapchainImageViews );
+		m_SwapchainImages = device.getSwapchainImagesKHR( m_Swapchain );
+		m_SwapchainImageViews.resize( m_SwapchainImages.size() );
+
+		for ( size_t i = 0; i < m_SwapchainImageViews.size(); i++ ) {
+			vk::ImageViewCreateInfo imageViewCreateInfo = {};
+			vk::ImageSubresourceRange subresourceRange( vk::ImageAspectFlagBits::eColor, 0, vk::RemainingMipLevels, 0, vk::RemainingArrayLayers );
+
+			imageViewCreateInfo.setViewType( vk::ImageViewType::e2D )
+				.setImage( m_SwapchainImages[ i ] )
+				.setFormat( m_SwapchainImageFormat )
+				.setSubresourceRange( subresourceRange );
+
+			m_SwapchainImageViews[ i ] = device.createImageView( imageViewCreateInfo );
+		}
 
 		RecompilePasses();
 	}
@@ -372,8 +398,8 @@ namespace Boundless {
 		vk::ImageView currentView = m_SwapchainImageViews[ m_CurrentImageIndex ];
 
 		vk::ClearValue clearValue = { { 0.1f, 0.1f, 0.1f, 1.f } };
-		vk::RenderingAttachmentInfo colorAttachment = VkUtil::RenderPassGetColorAttachmentInfo( currentView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
-		vk::RenderingInfo renderingInfo = VkUtil::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, nullptr );
+		vk::RenderingAttachmentInfo colorAttachment = vk_util::RenderPassGetColorAttachmentInfo( currentView, &clearValue, vk::ImageLayout::eAttachmentOptimal );
+		vk::RenderingInfo renderingInfo = vk_util::RenderPassCreateRenderingInfo( m_SwapchainExtents, &colorAttachment, nullptr );
 
 		commandBuffer.BeginRendering(renderingInfo);
 		commandBuffer.SetScissorAndViewport( float( m_SwapchainExtents.width ), float( m_SwapchainExtents.height ), 0.f, 0.f, 0.f, 1.f, false );

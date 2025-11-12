@@ -65,28 +65,32 @@ namespace Boundless {
 		GLFWwindow*									   m_GlfwWindow;
 		HWND										   m_WindowHandle = 0;
 		std::unique_ptr<Device>						   m_Device;
+		
+		// Swapchain & synchronization data.
 		vk::Extent2D								   m_SwapchainExtents;
 		std::vector<vk::ImageView>					   m_SwapchainImageViews;
 		std::vector<vk::Image>						   m_SwapchainImages;
 		std::vector<vk::Semaphore>					   m_SwapchainRenderFinishedSemaphores;
 		vk::Format									   m_SwapchainImageFormat;
-		vk::SwapchainKHR							   m_Swapchain = VK_NULL_HANDLE;
+		vk::SwapchainKHR							   m_Swapchain;
 		std::array<FrameData, MaxFramesInFlight>	   m_FrameData;
 		bool										   m_ResizeRequested = false;
-		//vk::Semaphore								   m_ComputeFinishedSemaphore = VK_NULL_HANDLE;
-		//vk::Fence									   m_ComputeInFlightFence = VK_NULL_HANDLE;
 		uint32_t									   m_CurrentImageIndex = 0;
 		uint32_t									   m_CurrentFrame = 0;
-		ShaderCompiler								   m_ShaderCompiler;
-		FrameConstants								   m_FrameConstants = {};
-		BufferHandle								   m_FrameConstantsBuffer = BufferHandle::Invalid;
-		vk::Pipeline								   m_FullscreenPipeline = VK_NULL_HANDLE;
+		
+		// Render passes.
+		std::unique_ptr<SkinningPass>				   m_Skinning;
 		std::unique_ptr<GBufferPass>				   m_GBuffer;
 		std::unique_ptr<GBufferDebugPass>			   m_GBufferDebug;
 		std::unique_ptr<LightingPass>				   m_Lighting;
 		std::unique_ptr<CompositePass>				   m_Composite;
 		std::vector<BaseRenderPass*>				   m_RenderPasses;
+
 		Scene										   m_Scene; // This should maybe be moved somewhere else.
+		ShaderCompiler								   m_ShaderCompiler;
+		FrameConstants								   m_FrameConstants = {};
+		BufferHandle								   m_FrameConstantsBuffer = BufferHandle::Invalid;
+		vk::Pipeline								   m_FullscreenPipeline;
 
 		// TODO: move/remove these.
 		void GenerateBrdfLut();

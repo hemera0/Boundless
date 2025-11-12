@@ -63,9 +63,6 @@
     <ClCompile Include="Scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OBJImporter.cpp">
-      <Filter>Source Files\Importers</Filter>
-    </ClCompile>
     <ClCompile Include="GLTFImporter.cpp">
       <Filter>Source Files\Importers</Filter>
     </ClCompile>
@@ -84,11 +81,11 @@
     <ClCompile Include="Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPasses.cpp">
-      <Filter>Source Files\Vulkan\RenderPasses</Filter>
-    </ClCompile>
     <ClCompile Include="CommandBuffer.cpp">
       <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPasses.cpp">
+      <Filter>Source Files\Vulkan\Resources</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -112,9 +109,6 @@
     </ClInclude>
     <ClInclude Include="Scene.hpp">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="OBJImporter.hpp">
-      <Filter>Header Files\Importers</Filter>
     </ClInclude>
     <ClInclude Include="GLTFImporter.hpp">
       <Filter>Header Files\Importers</Filter>

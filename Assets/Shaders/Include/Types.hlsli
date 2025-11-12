@@ -29,6 +29,7 @@ struct GBufferPushConstants {
     vk::BufferPointer<SceneData> Scene;
 	vk::BufferPointer<Material[1]> Materials;
 	vk::BufferPointer<Vertex[1]> Vertices;
+    float4x4 WorldTransform;
 	uint MaterialIndex;
 };
 
@@ -52,5 +53,14 @@ struct CompositePushConstants {
 
 struct BlitPushConstants {
     int Texture;
+};
+
+struct SkinningPushConstants {
+	vk::BufferPointer<Vertex[1]>   VertexBuffer;
+	vk::BufferPointer<Vertex[1]>   SkinnedVertexBuffer;
+	vk::BufferPointer<uint4[1]>    BoneIndicesBuffer;
+	vk::BufferPointer<float4[1]>   BoneWeightsBuffer;
+	vk::BufferPointer<float4x4[1]> BoneTransformsBuffer;
+	uint		                   VertexCount;
 };
 #endif

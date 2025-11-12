@@ -12,12 +12,12 @@ namespace Boundless {
 	}
 
 	PipelineBuilder::PipelineBuilder() {
-		m_MultisampleState			 = VkUtil::PipelineDefaultMultiSampleState();
-		m_InputAssemblyState		 = VkUtil::PipelineDefaultInputAssemblyState();
-		m_RasterizationState		 = VkUtil::PipelineDefaultRasterizationState();
-		m_DepthStencilState			 = VkUtil::PipelineDefaultDepthStencilState();
-		m_DynamicState				 = VkUtil::PipelineDefaultDynamicState();
-		m_ColorBlendAttachmentStates = { VkUtil::PipelineDefaultColorBlendAttachmentState() };
+		m_MultisampleState			 = vk_util::PipelineDefaultMultiSampleState();
+		m_InputAssemblyState		 = vk_util::PipelineDefaultInputAssemblyState();
+		m_RasterizationState		 = vk_util::PipelineDefaultRasterizationState();
+		m_DepthStencilState			 = vk_util::PipelineDefaultDepthStencilState();
+		m_DynamicState				 = vk_util::PipelineDefaultDynamicState();
+		m_ColorBlendAttachmentStates = { vk_util::PipelineDefaultColorBlendAttachmentState() };
 	}
 
 	vk::Pipeline ComputePipelineBuilder::Build( Device& device ) {
@@ -56,12 +56,10 @@ namespace Boundless {
 			const auto& [blob, shaderStage] = m_ShaderBlobs[ i ];
 
 			auto& module = shaderModules[ i ];
-			// module.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 			module.codeSize = blob->GetBufferSize();
 			module.pCode = reinterpret_cast< const uint32_t* >( blob->GetBufferPointer() );
 
 			auto& stage = shaderStages[ i ];
-			// stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			stage.stage = shaderStage; // TODO: FIX ME.... shader->GetStageFlags();
 			stage.pName = "main";
 			stage.pNext = &module;
